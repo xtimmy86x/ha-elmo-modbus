@@ -96,7 +96,7 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
 
         if armed_count == REGISTER_STATUS_COUNT:
             return AlarmControlPanelState.ARMED_AWAY
-        return AlarmControlPanelState.ARMED_HOME
+        return AlarmControlPanelState.DISARMED
 
     @property
     def available(self) -> bool:
