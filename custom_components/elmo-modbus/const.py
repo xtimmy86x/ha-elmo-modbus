@@ -4,6 +4,10 @@ DOMAIN = "elmo_modbus"
 PLATFORMS = ["alarm_control_panel"]
 DEFAULT_SCAN_INTERVAL = 30
 
+OPTION_ARMED_AWAY_SECTORS = "armed_away_sectors"
+OPTION_ARMED_HOME_SECTORS = "armed_home_sectors"
+OPTION_ARMED_NIGHT_SECTORS = "armed_night_sectors"
+
 # The panel exposes the arming status for up to 64 sectors through the Modbus
 # discrete input range ``0x3001``-``0x3040`` (FC2), i.e. address ``12289`` with
 # a span of 64 bits.  Each bit represents whether the corresponding sector is
