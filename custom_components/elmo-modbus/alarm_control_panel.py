@@ -14,15 +14,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, REGISTER_STATUS_COUNT
 from .coordinator import ElmoModbusCoordinator
-
-STATUS_TO_STATE: dict[int, AlarmControlPanelState] = {
-    0: AlarmControlPanelState.DISARMED,
-    1: AlarmControlPanelState.ARMED_HOME,
-    2: AlarmControlPanelState.ARMED_AWAY,
-    3: AlarmControlPanelState.TRIGGERED,
-}
 
 
 async def async_setup_entry(
@@ -63,8 +56,16 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
     @property
     def state(self) -> AlarmControlPanelState | None:
         """Return the current state of the alarm panel."""
-        status = self.coordinator.data
-        return STATUS_TO_STATE.get(status)
+        bits = self.coordinator.data
+        if bits is None:
+            return None
+
+        armed_count = sum(bits)
+        if armed_count == 0:
+            return AlarmControlPanelState.DISARMED
+        if armed_count == REGISTER_STATUS_COUNT:
+            return AlarmControlPanelState.ARMED_AWAY
+        return AlarmControlPanelState.ARMED_HOME
 
     @property
     def available(self) -> bool:
@@ -74,4 +75,15 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose the raw register value as an attribute."""
-        return {"raw_status_register": self.coordinator.data}
+        bits = self.coordinator.data
+        if bits is None:
+            return {}
+
+        armed_sectors = [index + 1 for index, bit in enumerate(bits) if bit]
+        disarmed_sectors = [index + 1 for index, bit in enumerate(bits) if not bit]
+
+        return {
+            "armed_sectors": armed_sectors,
+            "disarmed_sectors": disarmed_sectors,
+            "raw_sector_bits": bits,
+        }
