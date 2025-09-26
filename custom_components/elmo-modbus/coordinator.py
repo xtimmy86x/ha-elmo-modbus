@@ -43,7 +43,7 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
                     raise ConnectionException("Unable to connect to Modbus device")
 
             response = self._client.read_discrete_inputs(
-                REGISTER_STATUS_START, REGISTER_STATUS_COUNT
+                REGISTER_STATUS_START, count=REGISTER_STATUS_COUNT
             )
             if not response or getattr(response, "isError", lambda: True)():
                 raise ConnectionException("Invalid response when reading register")
