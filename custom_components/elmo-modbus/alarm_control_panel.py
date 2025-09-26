@@ -10,7 +10,7 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelState,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -35,7 +35,6 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
     _attr_name = "Alarm Panel"
     _attr_supported_features = AlarmControlPanelEntityFeature(0)
     _attr_code_arm_required = False
-    _attr_alarm_state: AlarmControlPanelState | None = None
 
     def __init__(self, entry: ConfigEntry, coordinator: ElmoModbusCoordinator) -> None:
         """Initialize the entity."""
@@ -53,19 +52,9 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
             name="Elmo Modbus Control Panel",
         )
 
-    async def async_added_to_hass(self) -> None:
-        """Handle entity being added to Home Assistant."""
-        await super().async_added_to_hass()
-        self._attr_alarm_state = self._derive_alarm_state()
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Update internal state from coordinator data."""
-        self._attr_alarm_state = self._derive_alarm_state()
-        super()._handle_coordinator_update()
-
-    def _derive_alarm_state(self) -> AlarmControlPanelState | None:
-        """Translate raw Modbus bits into an alarm state."""
+    @property
+    def alarm_state(self) -> AlarmControlPanelState | None:
+        """Return the current state of the alarm panel."""
         bits = self.coordinator.data
         if bits is None:
             return None
@@ -76,17 +65,6 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         if armed_count == REGISTER_STATUS_COUNT:
             return AlarmControlPanelState.ARMED_AWAY
         return AlarmControlPanelState.ARMED_HOME
-
-    @property
-    def alarm_state(self) -> AlarmControlPanelState | None:
-        """Return the current state of the alarm panel."""
-        return self._attr_alarm_state
-
-    @property
-    def state(self) -> str | None:
-        """Alias for backwards compatibility with the legacy state property."""
-        current_state = self._attr_alarm_state
-        return None if current_state is None else current_state.value
 
     @property
     def available(self) -> bool:
