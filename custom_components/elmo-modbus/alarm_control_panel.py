@@ -90,19 +90,29 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         mode = MODE_LABELS.get(option_key, option_key)
         raise HomeAssistantError(f"No sectors configured for {mode} arming mode")
 
-    def _build_command_payload(self, target_sectors: Iterable[int]) -> list[bool]:
+    def _build_command_payload(
+        self, target_sectors: Iterable[int], *, value: bool
+    ) -> list[bool]:
         """Convert a sector iterable into a bit payload for the command coils."""
 
-        payload = [False] * REGISTER_COMMAND_COUNT
+        if (
+            (current := self.coordinator.data)
+            and len(current) >= REGISTER_COMMAND_COUNT
+        ):
+            payload = list(current[:REGISTER_COMMAND_COUNT])
+        else:
+            payload = [False] * REGISTER_COMMAND_COUNT
         for sector in target_sectors:
             if 1 <= sector <= REGISTER_COMMAND_COUNT:
-                payload[sector - 1] = True
+                payload[sector - 1] = value
         return payload
 
-    async def _async_send_command(self, target_sectors: Iterable[int]) -> None:
+    async def _async_send_command(
+        self, target_sectors: Iterable[int], *, value: bool
+    ) -> None:
         """Send the Modbus command to set the desired arming state."""
 
-        payload = self._build_command_payload(target_sectors)
+        payload = self._build_command_payload(target_sectors, value=value)
 
         def _write() -> None:
             if not self._client.connected:
@@ -123,28 +133,32 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         """Send a Modbus command to disarm all sectors."""
 
         await self._async_send_command(
-            self._target_sectors(OPTION_DISARM_SECTORS, default_to_all=True)
+            self._target_sectors(OPTION_DISARM_SECTORS, default_to_all=True),
+            value=False,
         )
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send a Modbus command to arm the configured away sectors."""
 
         await self._async_send_command(
-            self._target_sectors(OPTION_ARMED_AWAY_SECTORS, default_to_all=True)
+            self._target_sectors(OPTION_ARMED_AWAY_SECTORS, default_to_all=True),
+            value=True,
         )
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         """Send a Modbus command to arm the configured home sectors."""
 
         await self._async_send_command(
-            self._target_sectors(OPTION_ARMED_HOME_SECTORS)
+            self._target_sectors(OPTION_ARMED_HOME_SECTORS),
+            value=True,
         )
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         """Send a Modbus command to arm the configured night sectors."""
 
         await self._async_send_command(
-            self._target_sectors(OPTION_ARMED_NIGHT_SECTORS)
+            self._target_sectors(OPTION_ARMED_NIGHT_SECTORS),
+            value=True,
         )
 
     def _sectors_for_option(self, option_key: str) -> set[int]:
