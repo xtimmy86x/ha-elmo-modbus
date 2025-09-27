@@ -155,10 +155,10 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options={
-                MENU_OPTION_PANELS: "panels",
-                MENU_OPTION_ADD_PANEL: "add_panel",
-                MENU_OPTION_USER_CODES: "user_codes",
-                MENU_OPTION_FINISH: "finish",
+                MENU_OPTION_PANELS,
+                MENU_OPTION_ADD_PANEL,
+                MENU_OPTION_USER_CODES,
+                MENU_OPTION_FINISH,
             },
         )
 
