@@ -1,0 +1,19 @@
+{
+  "options": {
+    "step": {
+      "user": {
+        "title": "Elmo Modbus panels",
+        "description": "Assign alarm sectors to each panel and arming mode. Use \u201cAdd panel\u201d to configure another panel.",
+        "data": {
+          "action": "Action"
+        }
+      }
+    },
+    "error": {
+      "invalid_sector": "Enter sector numbers within the supported range.",
+      "invalid_slug": "Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
+      "duplicate_slug": "Each panel must use a unique entity ID suffix.",
+      "required": "This field is required."
+    }
+  }
+}

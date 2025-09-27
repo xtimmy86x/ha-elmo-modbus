@@ -1,4 +1,4 @@
-"""Alarm control panel entity for the Elmo Modbus integration."""
+"""Alarm control panel entities for the Elmo Modbus integration."""
 
 from __future__ import annotations
 
@@ -18,45 +18,50 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import (
-    DOMAIN,
-    OPTION_ARMED_AWAY_SECTORS,
-    OPTION_ARMED_HOME_SECTORS,
-    OPTION_ARMED_NIGHT_SECTORS,
-    OPTION_DISARM_SECTORS,
-    REGISTER_COMMAND_COUNT,
-    REGISTER_COMMAND_START,
-    REGISTER_STATUS_COUNT,
-)
+from .const import DOMAIN, REGISTER_COMMAND_COUNT, REGISTER_COMMAND_START, REGISTER_STATUS_COUNT
 from .coordinator import ElmoModbusCoordinator
+from .panels import MODES, PanelDefinition, load_panel_definitions
 
 MODE_LABELS = {
-    OPTION_ARMED_AWAY_SECTORS: "Arm Away",
-    OPTION_ARMED_HOME_SECTORS: "Arm Home",
-    OPTION_ARMED_NIGHT_SECTORS: "Arm Night",
+    "away": "Arm Away",
+    "home": "Arm Home",
+    "night": "Arm Night",
+}
+
+
+STATE_PRIORITY = {
+    AlarmControlPanelState.ARMED_AWAY: 3,
+    AlarmControlPanelState.ARMED_NIGHT: 2,
+    AlarmControlPanelState.ARMED_HOME: 1,
+}
+
+MODE_TO_STATE = {
+    "away": AlarmControlPanelState.ARMED_AWAY,
+    "home": AlarmControlPanelState.ARMED_HOME,
+    "night": AlarmControlPanelState.ARMED_NIGHT,
 }
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
-    """Set up the alarm control panel entity from a config entry."""
+    """Set up the alarm control panel entities from a config entry."""
     data = hass.data[DOMAIN][entry.entry_id]
     coordinator: ElmoModbusCoordinator = data["coordinator"]
     client: ModbusTcpClient = data["client"]
 
-    async_add_entities([ElmoModbusAlarmControlPanel(entry, coordinator, client)])
+    panels = load_panel_definitions(entry.options)
+    entities = [
+        ElmoModbusAlarmControlPanel(entry, coordinator, client, panel)
+        for panel in panels
+    ]
 
+    if entities:
+        async_add_entities(entities)
 
 class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], AlarmControlPanelEntity):
     """Representation of the Modbus-backed alarm panel."""
 
     _attr_has_entity_name = True
-    _attr_name = "Alarm Panel"
-    _attr_supported_features = (
-        AlarmControlPanelEntityFeature.ARM_AWAY
-        | AlarmControlPanelEntityFeature.ARM_HOME
-        | AlarmControlPanelEntityFeature.ARM_NIGHT
-    )
     _attr_code_arm_required = False
 
     def __init__(
@@ -64,14 +69,36 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         entry: ConfigEntry,
         coordinator: ElmoModbusCoordinator,
         client: ModbusTcpClient,
+        panel: PanelDefinition,
     ) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
-        self._attr_unique_id = entry.entry_id
+        self._panel = panel
         self._config_entry = entry
         self._host = entry.data["host"]
         self._port = entry.data["port"]
         self._client = client
+
+        self._attr_unique_id = f"{entry.entry_id}:{panel.slug}"
+        self._attr_name = panel.name
+        self.entity_id = f"alarm_control_panel.{panel.slug}"
+
+        self._mode_sectors: dict[str, set[int]] = {}
+        for mode in MODES:
+            sectors = panel.mode_sectors(mode)
+            if sectors:
+                self._mode_sectors[mode] = sectors
+
+        self._managed_sectors = panel.managed_sectors
+
+        supported = AlarmControlPanelEntityFeature(0)
+        if "away" in self._mode_sectors:
+            supported |= AlarmControlPanelEntityFeature.ARM_AWAY
+        if "home" in self._mode_sectors:
+            supported |= AlarmControlPanelEntityFeature.ARM_HOME
+        if "night" in self._mode_sectors:
+            supported |= AlarmControlPanelEntityFeature.ARM_NIGHT
+        self._attr_supported_features = supported
 
     @property
     def _all_sectors(self) -> set[int]:
@@ -79,16 +106,15 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
 
         return {index + 1 for index in range(REGISTER_STATUS_COUNT)}
     
-    def _target_sectors(self, option_key: str, *, default_to_all: bool = False) -> set[int]:
+    def _target_sectors(self, mode: str) -> set[int]:
         """Return the sectors that should be armed for a specific mode."""
 
-        sectors = self._sectors_for_option(option_key)
+        sectors = self._mode_sectors.get(mode)
         if sectors:
             return sectors
-        if default_to_all:
-            return self._all_sectors
-        mode = MODE_LABELS.get(option_key, option_key)
-        raise HomeAssistantError(f"No sectors configured for {mode} arming mode")
+        raise HomeAssistantError(
+            f"No sectors configured for {MODE_LABELS.get(mode, mode)} on panel {self._panel.name}"
+        )
 
     def _build_command_payload(
         self, target_sectors: Iterable[int], *, value: bool
@@ -126,52 +152,38 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         try:
             await self.hass.async_add_executor_job(_write)
         except ConnectionException as err:
-            raise HomeAssistantError(f"Failed to send command to {self._host}:{self._port}") from err
+            raise HomeAssistantError(
+                f"Failed to send command to {self._host}:{self._port}"
+            ) from err
         await self.coordinator.async_request_refresh()
 
     async def async_alarm_disarm(self, code: str | None = None) -> None:
-        """Send a Modbus command to disarm all sectors."""
+        """Send a Modbus command to disarm the configured sectors."""
 
-        await self._async_send_command(
-            self._target_sectors(OPTION_DISARM_SECTORS, default_to_all=True),
-            value=False,
-        )
+        target = self._managed_sectors or self._all_sectors
+        await self._async_send_command(target, value=False)
 
     async def async_alarm_arm_away(self, code: str | None = None) -> None:
         """Send a Modbus command to arm the configured away sectors."""
 
-        await self._async_send_command(
-            self._target_sectors(OPTION_ARMED_AWAY_SECTORS, default_to_all=True),
-            value=True,
-        )
+        await self._async_send_command(self._target_sectors("away"), value=True)
 
     async def async_alarm_arm_home(self, code: str | None = None) -> None:
         """Send a Modbus command to arm the configured home sectors."""
 
-        await self._async_send_command(
-            self._target_sectors(OPTION_ARMED_HOME_SECTORS),
-            value=True,
-        )
+        await self._async_send_command(self._target_sectors("home"), value=True)
 
     async def async_alarm_arm_night(self, code: str | None = None) -> None:
         """Send a Modbus command to arm the configured night sectors."""
 
-        await self._async_send_command(
-            self._target_sectors(OPTION_ARMED_NIGHT_SECTORS),
-            value=True,
-        )
-
-    def _sectors_for_option(self, option_key: str) -> set[int]:
-        """Return the configured sector set for a specific arming mode."""
-
-        sectors = self._config_entry.options.get(option_key, [])
-        return {sector for sector in sectors if 1 <= sector <= REGISTER_STATUS_COUNT}
+        await self._async_send_command(self._target_sectors("night"), value=True)
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information for the alarm panel."""
+
         return DeviceInfo(
-            identifiers={(DOMAIN, self.unique_id)},
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
             manufacturer="Elmo",
             name="Elmo Modbus Control Panel",
         )
@@ -179,11 +191,11 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
     @property
     def alarm_state(self) -> AlarmControlPanelState | None:
         """Return the current state of the alarm panel."""
+
         bits = self.coordinator.data
         if bits is None:
             return None
 
-        # set di settori armati (1-based)
         armed_sectors = {i + 1 for i, b in enumerate(bits) if bool(b)}
         armed_count = len(armed_sectors)
         total = len(bits)
@@ -193,19 +205,13 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
 
         # set configurati per ciascuna modalità
         options_map: dict[AlarmControlPanelState, set[int]] = {
-            AlarmControlPanelState.ARMED_AWAY: set(self._sectors_for_option(OPTION_ARMED_AWAY_SECTORS) or []),
-            AlarmControlPanelState.ARMED_HOME: set(self._sectors_for_option(OPTION_ARMED_HOME_SECTORS) or []),
-            AlarmControlPanelState.ARMED_NIGHT: set(self._sectors_for_option(OPTION_ARMED_NIGHT_SECTORS) or []),
+            MODE_TO_STATE[mode]: sectors for mode, sectors in self._mode_sectors.items()
         }
-        # rimuovi profili non configurati (set vuoti)
-        options_map = {state: s for state, s in options_map.items() if s}
 
-        # 1) match esatto con un profilo
         for state, sectors in options_map.items():
             if armed_sectors == sectors:
                 return state
 
-        # 2) tutti i settori armati -> away
         if armed_count == total:
             return AlarmControlPanelState.ARMED_AWAY
 
@@ -214,20 +220,11 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         for state, sectors in options_map.items():
             overlap = len(armed_sectors & sectors)
             if overlap > 0:
-                matches.append((overlap, state))
+                matches.append((overlap, STATE_PRIORITY.get(state, 0), state))
 
         if matches:
-            # priorità: AWAY > NIGHT > HOME
-            priority = {
-                AlarmControlPanelState.ARMED_AWAY: 3,
-                AlarmControlPanelState.ARMED_NIGHT: 2,
-                AlarmControlPanelState.ARMED_HOME: 1,
-            }
-            # ordina per overlap desc poi priorità desc
-            matches.sort(key=lambda x: (x[0], priority.get(x[1], 0)), reverse=True)
-            return matches[0][1]
-
-        # 4) fallback per inserimenti non mappati
+            matches.sort(reverse=True)
+            return matches[0][2]
         try:
             return AlarmControlPanelState.ARMED_CUSTOM_BYPASS
         except AttributeError:
@@ -236,11 +233,12 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
     @property
     def available(self) -> bool:
         """Entity availability based on coordinator status."""
+
         return super().available and self.coordinator.last_update_success
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Expose the raw register value as an attribute."""
+        """Expose additional panel metadata."""
         bits = self.coordinator.data
         if bits is None:
             return {}
@@ -252,17 +250,15 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
             "armed_sectors": armed_sectors,
             "disarmed_sectors": disarmed_sectors,
             "raw_sector_bits": bits,
+            "panel_managed_sectors": sorted(self._managed_sectors),
+            "panel_slug": self._panel.slug,
         }
 
         armed_sectors_set = set(armed_sectors)
-        for state, option_key in (
-            ("armed_away", OPTION_ARMED_AWAY_SECTORS),
-            ("armed_home", OPTION_ARMED_HOME_SECTORS),
-            ("armed_night", OPTION_ARMED_NIGHT_SECTORS),
-        ):
-            configured = self._sectors_for_option(option_key)
-            if configured:
-                result[f"configured_{state}_sectors"] = sorted(configured)
-                result[f"is_{state}"] = armed_sectors_set == configured
+        for mode, sectors in self._mode_sectors.items():
+            if sectors:
+                state_key = MODE_TO_STATE[mode].value
+                result[f"configured_{mode}_sectors"] = sorted(sectors)
+                result[f"is_{state_key}"] = armed_sectors_set == sectors
 
         return result
