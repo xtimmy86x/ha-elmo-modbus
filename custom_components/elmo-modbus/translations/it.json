@@ -12,7 +12,17 @@
       },
       "panels": {
         "title": "Pannelli Elmo Modbus",
-        "description": "Assegna i settori di allarme a ciascun pannello e modalità di inserimento. I settori devono essere tra 1 e {max_sector}. Usa il menu per aggiungere un nuovo pannello se necessario."
+        "description": "Assegna i settori di allarme a ciascun pannello e alla modalità di inserimento. I settori devono essere compresi tra 1 e {max_sector}. Usa il menu per aggiungere un nuovo pannello se necessario.",
+        "data": {
+          "panel_name": "Nome pannello {index}",
+          "panel_entity_id_suffix": "Suffisso ID entità pannello {index}",
+          "panel_mode_sectors": "Settori modalità {mode} per pannello {index}",
+          "panel_remove": "Rimuovi pannello {index}"
+        },
+        "data_description": {
+          "panel_entity_id_suffix": "Suffisso opzionale aggiunto all’ID entità del pannello di allarme.",
+          "panel_mode_sectors": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità {mode}."
+        }
       },
       "user_codes": {
         "title": "Codici utente",

@@ -12,7 +12,17 @@
       },
       "panels": {
         "title": "Elmo Modbus panels",
-        "description": "Assign alarm sectors to each panel and arming mode. Sectors must be between 1 and {max_sector}. Use the menu to add a new panel if needed."
+        "description": "Assign alarm sectors to each panel and arming mode. Sectors must be between 1 and {max_sector}. Use the menu to add a new panel if needed.",
+        "data": {
+          "panel_name": "Panel {index} name",
+          "panel_entity_id_suffix": "Panel {index} entity ID suffix",
+          "panel_mode_sectors": "{mode} sectors for panel {index}",
+          "panel_remove": "Remove panel {index}"
+        },
+        "data_description": {
+          "panel_entity_id_suffix": "Optional suffix appended to the alarm panel entity ID.",
+          "panel_mode_sectors": "Provide a comma-separated list of sectors to arm when using {mode} mode."
+        }
       },
       "user_codes": {
         "title": "User codes",
