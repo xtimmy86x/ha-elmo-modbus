@@ -183,31 +183,55 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         if bits is None:
             return None
 
-        armed_count = sum(bits)
+        # set di settori armati (1-based)
+        armed_sectors = {i + 1 for i, b in enumerate(bits) if bool(b)}
+        armed_count = len(armed_sectors)
+        total = len(bits)
+
         if armed_count == 0:
             return AlarmControlPanelState.DISARMED
-        
-        armed_sectors = {index + 1 for index, bit in enumerate(bits) if bit}
 
-        options_map = {
-            AlarmControlPanelState.ARMED_AWAY: self._sectors_for_option(
-                OPTION_ARMED_AWAY_SECTORS
-            ),
-            AlarmControlPanelState.ARMED_HOME: self._sectors_for_option(
-                OPTION_ARMED_HOME_SECTORS
-            ),
-            AlarmControlPanelState.ARMED_NIGHT: self._sectors_for_option(
-                OPTION_ARMED_NIGHT_SECTORS
-            ),
+        # set configurati per ciascuna modalità
+        options_map: dict[AlarmControlPanelState, set[int]] = {
+            AlarmControlPanelState.ARMED_AWAY: set(self._sectors_for_option(OPTION_ARMED_AWAY_SECTORS) or []),
+            AlarmControlPanelState.ARMED_HOME: set(self._sectors_for_option(OPTION_ARMED_HOME_SECTORS) or []),
+            AlarmControlPanelState.ARMED_NIGHT: set(self._sectors_for_option(OPTION_ARMED_NIGHT_SECTORS) or []),
         }
+        # rimuovi profili non configurati (set vuoti)
+        options_map = {state: s for state, s in options_map.items() if s}
 
+        # 1) match esatto con un profilo
         for state, sectors in options_map.items():
-            if sectors and armed_sectors == sectors:
+            if armed_sectors == sectors:
                 return state
 
-        if armed_count == REGISTER_STATUS_COUNT:
+        # 2) tutti i settori armati -> away
+        if armed_count == total:
             return AlarmControlPanelState.ARMED_AWAY
-        return AlarmControlPanelState.DISARMED
+
+        # 3) match per intersezione: scegli il profilo con overlap massimo, poi per priorità
+        matches = []
+        for state, sectors in options_map.items():
+            overlap = len(armed_sectors & sectors)
+            if overlap > 0:
+                matches.append((overlap, state))
+
+        if matches:
+            # priorità: AWAY > NIGHT > HOME
+            priority = {
+                AlarmControlPanelState.ARMED_AWAY: 3,
+                AlarmControlPanelState.ARMED_NIGHT: 2,
+                AlarmControlPanelState.ARMED_HOME: 1,
+            }
+            # ordina per overlap desc poi priorità desc
+            matches.sort(key=lambda x: (x[0], priority.get(x[1], 0)), reverse=True)
+            return matches[0][1]
+
+        # 4) fallback per inserimenti non mappati
+        try:
+            return AlarmControlPanelState.ARMED_CUSTOM_BYPASS
+        except AttributeError:
+            return AlarmControlPanelState.ARMED_AWAY
 
     @property
     def available(self) -> bool:

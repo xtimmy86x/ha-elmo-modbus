@@ -2,7 +2,7 @@
 
 DOMAIN = "elmo_modbus"
 PLATFORMS = ["alarm_control_panel"]
-DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_SCAN_INTERVAL = 5
 
 OPTION_ARMED_AWAY_SECTORS = "armed_away_sectors"
 OPTION_ARMED_HOME_SECTORS = "armed_home_sectors"
