@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
@@ -96,7 +95,9 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(self, user_input: dict[str, str] | None = None) -> FlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, str] | None = None
+    ) -> FlowResult:
         """Handle the initial step where the user enters connection details."""
         if user_input is not None:
             await self.async_set_unique_id(f"{user_input['host']}:{user_input['port']}")
@@ -105,7 +106,6 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=user_input["host"], data=user_input)
 
         return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
-    
 
     @staticmethod
     @callback
@@ -207,9 +207,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         return defaults
 
-    def _build_schema(
-        self, user_input: dict[str, Any] | None
-    ) -> vol.Schema:
+    def _build_schema(self, user_input: dict[str, Any] | None) -> vol.Schema:
         """Build the form schema for the current panel list."""
 
         schema: dict[Any, Any] = {}
@@ -223,11 +221,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 )
             ] = str
             for mode in MODES:
-                schema[
-                    vol.Optional(f"{prefix}{mode}", default=defaults[mode])
-                ] = str
+                schema[vol.Optional(f"{prefix}{mode}", default=defaults[mode])] = str
             schema[vol.Optional(f"{prefix}remove", default=defaults["remove"])] = bool
-
 
         return vol.Schema(schema)
 
@@ -267,10 +262,15 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 name_value = name_input or panel.get("name", f"Panel {index + 1}")
 
                 slug_input = (user_input.get(f"{prefix}entity_id_suffix") or "").strip()
-                slug_candidate = slugify(slug_input) if slug_input else slugify(name_value)
+                slug_candidate = (
+                    slugify(slug_input) if slug_input else slugify(name_value)
+                )
                 if not slug_candidate:
                     errors[f"{prefix}entity_id_suffix"] = "invalid_slug"
-                    slug_candidate = slugify(panel.get("entity_id_suffix") or name_value) or f"panel_{index + 1}"
+                    slug_candidate = (
+                        slugify(panel.get("entity_id_suffix") or name_value)
+                        or f"panel_{index + 1}"
+                    )
 
                 modes: dict[str, list[int]] = {}
                 for mode in MODES:
@@ -299,7 +299,9 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     slug_value = f"panel_{index + 1}"
                 if slug_value in slug_seen:
                     errors[f"panel_{index}_entity_id_suffix"] = "duplicate_slug"
-                    errors[f"panel_{slug_seen[slug_value]}_entity_id_suffix"] = "duplicate_slug"
+                    errors[f"panel_{slug_seen[slug_value]}_entity_id_suffix"] = (
+                        "duplicate_slug"
+                    )
                 else:
                     slug_seen[slug_value] = index
                 panel["entity_id_suffix"] = slug_value
@@ -333,9 +335,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     "codes",
                     default=_format_user_codes(self._user_codes),
-                ): selector.TextSelector(
-                    selector.TextSelectorConfig(multiline=True)
-                )
+                ): selector.TextSelector(selector.TextSelectorConfig(multiline=True))
             }
         )
 

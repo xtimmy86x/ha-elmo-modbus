@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pymodbus.client import ModbusTcpClient
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
+from pymodbus.client import ModbusTcpClient
 
 from .const import DOMAIN, PLATFORMS
 from .coordinator import ElmoModbusCoordinator
@@ -38,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
+
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload an Elmo Modbus config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
@@ -50,6 +50,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hass.async_add_executor_job(client.close)
 
     return unload_ok
+
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options updates by reloading the config entry."""

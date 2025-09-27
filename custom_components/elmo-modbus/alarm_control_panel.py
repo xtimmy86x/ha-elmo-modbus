@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from pymodbus.client import ModbusTcpClient
-from pymodbus.exceptions import ConnectionException
-
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
     AlarmControlPanelEntityFeature,
@@ -18,6 +15,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from pymodbus.client import ModbusTcpClient
+from pymodbus.exceptions import ConnectionException
 
 from .const import (
     DOMAIN,
@@ -48,6 +47,7 @@ MODE_TO_STATE = {
     "night": AlarmControlPanelState.ARMED_NIGHT,
 }
 
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
@@ -65,7 +65,10 @@ async def async_setup_entry(
     if entities:
         async_add_entities(entities)
 
-class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], AlarmControlPanelEntity):
+
+class ElmoModbusAlarmControlPanel(
+    CoordinatorEntity[ElmoModbusCoordinator], AlarmControlPanelEntity
+):
     """Representation of the Modbus-backed alarm panel."""
 
     _attr_has_entity_name = True
@@ -123,14 +126,15 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
 
         return {index + 1 for index in range(REGISTER_STATUS_COUNT)}
 
-
     def _require_valid_code(self, code: str | None) -> None:
         """Ensure the provided code is valid when codes are configured."""
 
         if not self._user_codes:
             return
         if code is None:
-            raise HomeAssistantError("A valid code is required to control this alarm panel.")
+            raise HomeAssistantError(
+                "A valid code is required to control this alarm panel."
+            )
         if code not in self._user_codes:
             raise HomeAssistantError("Invalid code provided.")
 
@@ -141,7 +145,8 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         if sectors:
             return sectors
         raise HomeAssistantError(
-            f"No sectors configured for {MODE_LABELS.get(mode, mode)} on panel {self._panel.name}"
+            f"No sectors configured for {MODE_LABELS.get(mode, mode)}"
+            "on panel {self._panel.name}"
         )
 
     def _build_command_payload(
@@ -149,10 +154,9 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
     ) -> list[bool]:
         """Convert a sector iterable into a bit payload for the command coils."""
 
-        if (
-            (current := self.coordinator.data)
-            and len(current) >= REGISTER_COMMAND_COUNT
-        ):
+        if (current := self.coordinator.data) and len(
+            current
+        ) >= REGISTER_COMMAND_COUNT:
             payload = list(current[:REGISTER_COMMAND_COUNT])
         else:
             payload = [False] * REGISTER_COMMAND_COUNT
@@ -255,7 +259,8 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
         if panel_armed_count == 0:
             return AlarmControlPanelState.DISARMED
 
-        # mappa modalità -> set settori configurati (già limitati per definizione del pannello)
+        # mappa modalità -> set settori configurati
+        # (già limitati per definizione del pannello)
         options_map: dict[AlarmControlPanelState, set[int]] = {
             MODE_TO_STATE[mode]: sectors for mode, sectors in self._mode_sectors.items()
         }
@@ -328,6 +333,6 @@ class ElmoModbusAlarmControlPanel(CoordinatorEntity[ElmoModbusCoordinator], Alar
             if sectors:
                 state_key = MODE_TO_STATE[mode].value
                 result[f"configured_{mode}_sectors"] = sorted(sectors)
-                result[f"is_{state_key}"] = (armed_set == sectors)
+                result[f"is_{state_key}"] = armed_set == sectors
 
         return result

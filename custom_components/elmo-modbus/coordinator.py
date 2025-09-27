@@ -5,17 +5,12 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-
-from .const import (
-    DEFAULT_SCAN_INTERVAL,
-    REGISTER_STATUS_COUNT,
-    REGISTER_STATUS_START,
-)
+from .const import DEFAULT_SCAN_INTERVAL, REGISTER_STATUS_COUNT, REGISTER_STATUS_START
 
 LOGGER = logging.getLogger(__name__)
 

@@ -102,7 +102,9 @@ class PanelDefinition:
         name = str(raw.get("name") or f"Panel {default_index}")
         slug_value = str(raw.get("entity_id_suffix") or "").strip()
         slug_candidate = slugify(slug_value) if slug_value else slugify(name)
-        slug = _ensure_unique_slug(slug_candidate or f"panel_{default_index}", used_slugs)
+        slug = _ensure_unique_slug(
+            slug_candidate or f"panel_{default_index}", used_slugs
+        )
 
         modes_data = raw.get("modes", {})
         modes: dict[str, set[int]] = {}
@@ -131,7 +133,8 @@ class PanelDefinition:
         disarm_sectors = _sanitize_sectors(options.get(OPTION_DISARM_SECTORS))
 
         if not modes:
-            # Old behaviour armed all sectors when no specific configuration was provided.
+            # Old behaviour armed all sectors when
+            # no specific configuration was provided.
             modes["away"] = set(range(1, REGISTER_STATUS_COUNT + 1))
 
         if disarm_sectors:
