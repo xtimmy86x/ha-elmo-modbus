@@ -12,7 +12,7 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
-from .const import DOMAIN, REGISTER_STATUS_COUNT
+from .const import DOMAIN, OPTION_USER_CODES, REGISTER_STATUS_COUNT
 from .panels import MODES, load_panel_definitions, panels_to_options
 
 DATA_SCHEMA = vol.Schema(
@@ -22,8 +22,10 @@ DATA_SCHEMA = vol.Schema(
     }
 )
 
-ACTION_SAVE = "save"
-ACTION_ADD = "add"
+MENU_OPTION_PANELS = "panels"
+MENU_OPTION_ADD_PANEL = "add_panel"
+MENU_OPTION_USER_CODES = "user_codes"
+MENU_OPTION_FINISH = "finish"
 
 
 def _format_sector_list(sectors: list[int] | None) -> str:
@@ -58,6 +60,35 @@ def _parse_sector_input(value: str) -> list[int]:
         result.append(sector)
 
     return sorted(result)
+
+
+def _format_user_codes(codes: list[str] | None) -> str:
+    """Return a newline separated string suitable for the form defaults."""
+
+    if not codes:
+        return ""
+    return "\n".join(codes)
+
+
+def _parse_user_code_input(value: str) -> list[str]:
+    """Parse the user provided codes into a normalised list."""
+
+    if not value:
+        return []
+
+    seen: set[str] = set()
+    result: list[str] = []
+
+    for raw_code in value.splitlines():
+        code = raw_code.strip()
+        if not code:
+            continue
+        if code in seen:
+            raise vol.Invalid("duplicate_code")
+        seen.add(code)
+        result.append(code)
+
+    return result
 
 
 class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -109,12 +140,41 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 }
             )
 
+        raw_codes = config_entry.options.get(OPTION_USER_CODES, [])
+        self._user_codes: list[str] = []
+        if isinstance(raw_codes, list):
+            for code in raw_codes:
+                if isinstance(code, str) and code.strip():
+                    self._user_codes.append(code.strip())
+
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
     ) -> FlowResult:
-        """Handle the first step of the options flow."""
+        """Display the options menu."""
 
-        return await self.async_step_user(user_input)
+        return self.async_show_menu(
+            step_id="init",
+            menu_options={
+                MENU_OPTION_PANELS: "panels",
+                MENU_OPTION_ADD_PANEL: "add_panel",
+                MENU_OPTION_USER_CODES: "user_codes",
+                MENU_OPTION_FINISH: "finish",
+            },
+        )
+
+    async def async_step_add_panel(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Create a new panel with default values and open the panel editor."""
+
+        self._panels.append(
+            {
+                "name": f"Panel {len(self._panels) + 1}",
+                "entity_id_suffix": "",
+                "modes": {},
+            }
+        )
+        return await self.async_step_panels()
 
     def _panel_defaults(
         self, index: int, user_input: dict[str, Any] | None
@@ -168,20 +228,10 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 ] = str
             schema[vol.Optional(f"{prefix}remove", default=defaults["remove"])] = bool
 
-        action_selector = selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=[
-                    selector.SelectOptionDict(value=ACTION_SAVE, label="Save"),
-                    selector.SelectOptionDict(value=ACTION_ADD, label="Add panel"),
-                ],
-                mode=selector.SelectSelectorMode.DROPDOWN,
-            )
-        )
-        schema[vol.Required("action", default=ACTION_SAVE)] = action_selector
 
         return vol.Schema(schema)
 
-    def _show_form(
+    def _show_panel_form(
         self,
         *,
         errors: dict[str, str] | None = None,
@@ -190,7 +240,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         """Return the options form."""
 
         return self.async_show_form(
-            step_id="user",
+            step_id="panels",
             data_schema=self._build_schema(user_input),
             errors=errors or {},
             description_placeholders={
@@ -198,7 +248,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             },
         )
 
-    async def async_step_user(
+    async def async_step_panels(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Collect the sector mappings for each arming mode."""
@@ -254,25 +304,52 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     slug_seen[slug_value] = index
                 panel["entity_id_suffix"] = slug_value
 
-            action = user_input.get("action", ACTION_SAVE)
-
             if errors:
                 self._panels = updated_panels
-                return self._show_form(errors=errors, user_input=user_input)
+                return self._show_panel_form(errors=errors, user_input=user_input)
 
             self._panels = updated_panels
+            return await self.async_step_init()
 
-            if action == ACTION_ADD:
-                self._panels.append(
-                    {
-                        "name": f"Panel {len(self._panels) + 1}",
-                        "entity_id_suffix": "",
-                        "modes": {},
-                    }
+        return self._show_panel_form()
+
+    async def async_step_user_codes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure one or more user codes for the alarm panels."""
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                codes = _parse_user_code_input(user_input.get("codes", ""))
+            except vol.Invalid as err:
+                errors["codes"] = err.error_message or "invalid_code"
+            else:
+                self._user_codes = codes
+                return await self.async_step_init()
+
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    "codes",
+                    default=_format_user_codes(self._user_codes),
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True)
                 )
-                return self._show_form()
+            }
+        )
 
-            options = panels_to_options(self._panels)
-            return self.async_create_entry(title="", data=options)
+        return self.async_show_form(
+            step_id="user_codes",
+            data_schema=schema,
+            errors=errors,
+        )
 
-        return self._show_form()
+    async def async_step_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Persist the configured options and close the flow."""
+
+        options = panels_to_options(self._panels)
+        options[OPTION_USER_CODES] = list(self._user_codes)
+        return self.async_create_entry(title="", data=options)
