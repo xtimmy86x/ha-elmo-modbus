@@ -11,17 +11,28 @@
         }
       },
       "panels": {
-        "title": "Pannelli Elmo Modbus",
-        "description": "Assegna i settori di allarme a ciascun pannello e alla modalità di inserimento. I settori devono essere compresi tra 1 e {max_sector}. Usa il menu per aggiungere un nuovo pannello se necessario.",
+        "title": "Seleziona pannello",
+        "description": "Scegli il pannello da modificare. Usa il menu opzioni per aggiungere un nuovo pannello se necessario.",
         "data": {
-          "panel_name": "Nome pannello {index}",
-          "panel_entity_id_suffix": "Suffisso ID entità pannello {index}",
-          "panel_mode_sectors": "Settori modalità {mode} per pannello {index}",
-          "panel_remove": "Rimuovi pannello {index}"
+          "panel": "Pannello"
+        }
+      },
+      "panel_edit": {
+        "title": "Modifica pannello",
+        "description": "Assegna i settori di allarme a ciascuna modalità di inserimento per {panel_name}. I settori devono essere compresi tra 1 e {max_sector}.",
+        "data": {
+          "name": "Nome pannello",
+          "entity_id_suffix": "Suffisso ID entità",
+          "away": "Settori modalità away",
+          "home": "Settori modalità home",
+          "night": "Settori modalità night",
+          "remove": "Rimuovi questo pannello"
         },
         "data_description": {
-          "panel_entity_id_suffix": "Suffisso opzionale aggiunto all’ID entità del pannello di allarme.",
-          "panel_mode_sectors": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità {mode}."
+          "entity_id_suffix": "Suffisso opzionale aggiunto all’ID entità del pannello di allarme.",
+          "away": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità away.",
+          "home": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità home.",
+          "night": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità night."
         }
       },
       "user_codes": {

@@ -126,6 +126,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         self._config_entry = config_entry
         definitions = load_panel_definitions(config_entry.options)
         self._panels: list[dict[str, Any]] = []
+        self._panel_index: int | None = None
         for panel in definitions:
             modes: dict[str, list[int]] = {}
             for mode in MODES:
@@ -176,27 +177,23 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         )
         return await self.async_step_panels()
 
-    def _panel_defaults(
+    def _panel_form_defaults(
         self, index: int, user_input: dict[str, Any] | None
     ) -> dict[str, Any]:
-        """Return default values for the form based on the current panel state."""
+        """Return default values for the single panel editor."""
 
         panel = self._panels[index]
-        prefix = f"panel_{index}_"
         defaults: dict[str, Any] = {}
 
         if user_input is not None:
-            defaults["name"] = user_input.get(
-                f"{prefix}name", panel.get("name", f"Panel {index + 1}")
-            )
+            defaults["name"] = user_input.get("name", panel.get("name") or "")
             defaults["entity_id_suffix"] = user_input.get(
-                f"{prefix}entity_id_suffix", panel.get("entity_id_suffix", "")
+                "entity_id_suffix", panel.get("entity_id_suffix", "")
             )
-            defaults["remove"] = bool(user_input.get(f"{prefix}remove", False))
+            defaults["remove"] = bool(user_input.get("remove", False))
             for mode in MODES:
                 defaults[mode] = user_input.get(
-                    f"{prefix}{mode}",
-                    _format_sector_list(panel.get("modes", {}).get(mode)),
+                    mode, _format_sector_list(panel.get("modes", {}).get(mode))
                 )
         else:
             defaults["name"] = panel.get("name", f"Panel {index + 1}")
@@ -207,113 +204,151 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         return defaults
 
-    def _build_schema(self, user_input: dict[str, Any] | None) -> vol.Schema:
-        """Build the form schema for the current panel list."""
-
-        schema: dict[Any, Any] = {}
-        for index, _ in enumerate(self._panels):
-            defaults = self._panel_defaults(index, user_input)
-            prefix = f"panel_{index}_"
-            schema[vol.Required(f"{prefix}name", default=defaults["name"])] = str
-            schema[
-                vol.Optional(
-                    f"{prefix}entity_id_suffix", default=defaults["entity_id_suffix"]
-                )
-            ] = str
-            for mode in MODES:
-                schema[vol.Optional(f"{prefix}{mode}", default=defaults[mode])] = str
-            schema[vol.Optional(f"{prefix}remove", default=defaults["remove"])] = bool
-
-        return vol.Schema(schema)
-
-    def _show_panel_form(
-        self,
-        *,
-        errors: dict[str, str] | None = None,
-        user_input: dict[str, Any] | None = None,
-    ) -> FlowResult:
-        """Return the options form."""
-
-        return self.async_show_form(
-            step_id="panels",
-            data_schema=self._build_schema(user_input),
-            errors=errors or {},
-            description_placeholders={
-                "max_sector": str(REGISTER_STATUS_COUNT),
-            },
-        )
-
     async def async_step_panels(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Collect the sector mappings for each arming mode."""
+        """Allow the user to choose which panel to edit."""
+
+        if not self._panels:
+            return self.async_show_form(
+                step_id="panels",
+                data_schema=vol.Schema({}),
+                errors={"base": "no_panels"},
+            )
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            updated_panels: list[dict[str, Any]] = []
-            for index, panel in enumerate(self._panels):
-                prefix = f"panel_{index}_"
-                if user_input.get(f"{prefix}remove"):
-                    continue
+            selection = user_input.get("panel")
+            try:
+                index = int(selection)
+            except (TypeError, ValueError):
+                errors["panel"] = "invalid_panel"
+            else:
+                if 0 <= index < len(self._panels):
+                    self._panel_index = index
+                    return await self.async_step_panel_edit()
+                errors["panel"] = "invalid_panel"
 
-                name_input = (user_input.get(f"{prefix}name") or "").strip()
-                if not name_input:
-                    errors[f"{prefix}name"] = "required"
-                name_value = name_input or panel.get("name", f"Panel {index + 1}")
+        options = [
+            selector.SelectOptionDict(
+                value=str(index),
+                label=panel.get("name") or f"Panel {index + 1}",
+            )
+            for index, panel in enumerate(self._panels)
+        ]
 
-                slug_input = (user_input.get(f"{prefix}entity_id_suffix") or "").strip()
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    "panel",
+                    default=(
+                        str(self._panel_index)
+                        if self._panel_index is not None
+                        else "0"
+                    ),
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                )
+            }
+        )
+
+        return self.async_show_form(
+            step_id="panels",
+            data_schema=schema,
+            errors=errors,
+        )
+
+    async def async_step_panel_edit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Display the editor for the selected panel."""
+
+        if self._panel_index is None or self._panel_index >= len(self._panels):
+            self._panel_index = None
+            return await self.async_step_panels()
+
+        index = self._panel_index
+        panel = self._panels[index]
+        defaults = self._panel_form_defaults(index, user_input)
+        schema_dict: dict[Any, Any] = {
+            vol.Required("name", default=defaults["name"]): str,
+            vol.Optional(
+                "entity_id_suffix", default=defaults["entity_id_suffix"]
+            ): str,
+        }
+        for mode in MODES:
+            schema_dict[vol.Optional(mode, default=defaults[mode])] = str
+        schema_dict[vol.Optional("remove", default=defaults["remove"])] = bool
+        schema = vol.Schema(schema_dict)
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            if user_input.get("remove"):
+                self._panels.pop(index)
+                self._panel_index = None
+                return await self.async_step_panels()
+
+            name_input = (user_input.get("name") or "").strip()
+            if not name_input:
+                errors["name"] = "required"
+            name_value = name_input or panel.get("name", f"Panel {index + 1}")
+
+            slug_input = (user_input.get("entity_id_suffix") or "").strip()
+            slug_candidate = (
+                slugify(slug_input) if slug_input else slugify(name_value)
+            )
+            if not slug_candidate:
+                errors["entity_id_suffix"] = "invalid_slug"
                 slug_candidate = (
-                    slugify(slug_input) if slug_input else slugify(name_value)
-                )
-                if not slug_candidate:
-                    errors[f"{prefix}entity_id_suffix"] = "invalid_slug"
-                    slug_candidate = (
-                        slugify(panel.get("entity_id_suffix") or name_value)
-                        or f"panel_{index + 1}"
-                    )
-
-                modes: dict[str, list[int]] = {}
-                for mode in MODES:
-                    field = f"{prefix}{mode}"
-                    try:
-                        sectors = _parse_sector_input(user_input.get(field, ""))
-                    except vol.Invalid:
-                        errors[field] = "invalid_sector"
-                        sectors = panel.get("modes", {}).get(mode, [])
-                    if sectors:
-                        modes[mode] = sectors
-
-                updated_panels.append(
-                    {
-                        "name": name_value,
-                        "entity_id_suffix": slug_candidate,
-                        "modes": modes,
-                    }
+                    slugify(panel.get("entity_id_suffix") or name_value)
+                    or f"panel_{index + 1}"
                 )
 
-            # Ensure unique slugs across the updated panel set.
-            slug_seen: dict[str, int] = {}
-            for index, panel in enumerate(updated_panels):
-                slug_value = slugify(panel.get("entity_id_suffix") or panel["name"])
-                if not slug_value:
-                    slug_value = f"panel_{index + 1}"
-                if slug_value in slug_seen:
-                    errors[f"panel_{index}_entity_id_suffix"] = "duplicate_slug"
-                    errors[f"panel_{slug_seen[slug_value]}_entity_id_suffix"] = (
-                        "duplicate_slug"
+            modes: dict[str, list[int]] = {}
+            for mode in MODES:
+                try:
+                    sectors = _parse_sector_input(user_input.get(mode, ""))
+                except vol.Invalid:
+                    errors[mode] = "invalid_sector"
+                    sectors = panel.get("modes", {}).get(mode, [])
+                if sectors:
+                    modes[mode] = sectors
+
+            slug_value = slug_candidate
+            if not errors:
+                for other_index, other in enumerate(self._panels):
+                    if other_index == index:
+                        continue
+                    other_slug = slugify(
+                        other.get("entity_id_suffix") or other.get("name") or ""
                     )
-                else:
-                    slug_seen[slug_value] = index
-                panel["entity_id_suffix"] = slug_value
+                    if not other_slug:
+                        other_slug = f"panel_{other_index + 1}"
+                    if other_slug == slug_value:
+                        errors["entity_id_suffix"] = "duplicate_slug"
+                        break
 
-            if errors:
-                self._panels = updated_panels
-                return self._show_panel_form(errors=errors, user_input=user_input)
+            if not errors:
+                self._panels[index] = {
+                    "name": name_value,
+                    "entity_id_suffix": slug_value,
+                    "modes": modes,
+                }
+                self._panel_index = None
+                return await self.async_step_panels()
 
-            self._panels = updated_panels
-            return await self.async_step_init()
-
-        return self._show_panel_form()
+        return self.async_show_form(
+            step_id="panel_edit",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "panel_name": panel.get("name", f"Panel {index + 1}"),
+                "max_sector": str(REGISTER_STATUS_COUNT),
+            },
+        )
 
     async def async_step_user_codes(
         self, user_input: dict[str, Any] | None = None

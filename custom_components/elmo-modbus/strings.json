@@ -11,17 +11,28 @@
         }
       },
       "panels": {
-        "title": "Elmo Modbus panels",
-        "description": "Assign alarm sectors to each panel and arming mode. Sectors must be between 1 and {max_sector}. Use the menu to add a new panel if needed.",
+        "title": "Select panel",
+        "description": "Choose the panel to edit. Use the options menu to add a new panel if needed.",
         "data": {
-          "panel_name": "Panel {index} name",
-          "panel_entity_id_suffix": "Panel {index} entity ID suffix",
-          "panel_mode_sectors": "{mode} sectors for panel {index}",
-          "panel_remove": "Remove panel {index}"
+          "panel": "Panel"
+        }
+      },
+      "panel_edit": {
+        "title": "Edit panel",
+        "description": "Assign alarm sectors to each arming mode for {panel_name}. Sectors must be between 1 and {max_sector}.",
+        "data": {
+          "name": "Panel name",
+          "entity_id_suffix": "Entity ID suffix",
+          "away": "Away mode sectors",
+          "home": "Home mode sectors",
+          "night": "Night mode sectors",
+          "remove": "Remove this panel"
         },
         "data_description": {
-          "panel_entity_id_suffix": "Optional suffix appended to the alarm panel entity ID.",
-          "panel_mode_sectors": "Provide a comma-separated list of sectors to arm when using {mode} mode."
+          "entity_id_suffix": "Optional suffix appended to the alarm panel entity ID.",
+          "away": "Provide a comma-separated list of sectors to arm when using away mode.",
+          "home": "Provide a comma-separated list of sectors to arm when using home mode.",
+          "night": "Provide a comma-separated list of sectors to arm when using night mode."
         }
       },
       "user_codes": {
