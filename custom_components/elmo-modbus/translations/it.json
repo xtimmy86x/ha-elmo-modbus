@@ -1,0 +1,34 @@
+{
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Elmo Modbus",
+        "menu_options": {
+          "panels": "Configura pannelli",
+          "add_panel": "Aggiungi pannello",
+          "user_codes": "Gestisci codici utente",
+          "finish": "Salva modifiche"
+        }
+      },
+      "panels": {
+        "title": "Pannelli Elmo Modbus",
+        "description": "Assegna i settori di allarme a ciascun pannello e modalità di inserimento. I settori devono essere tra 1 e {max_sector}. Usa il menu per aggiungere un nuovo pannello se necessario."
+      },
+      "user_codes": {
+        "title": "Codici utente",
+        "description": "Inserisci un codice per riga. Lascia vuoto per disabilitare la verifica del codice.",
+        "data": {
+          "codes": "Codici"
+        }
+      }
+    },
+    "error": {
+      "invalid_sector": "Inserisci numeri di settore nel range supportato.",
+      "invalid_slug": "Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
+      "duplicate_slug": "Ogni pannello deve avere un suffisso ID entità univoco.",
+      "required": "Questo campo è obbligatorio.",
+      "duplicate_code": "Ogni codice deve essere univoco.",
+      "invalid_code": "Inserisci almeno un codice valido oppure lascia il campo vuoto."
+    }
+  }
+}
