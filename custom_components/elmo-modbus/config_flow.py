@@ -24,7 +24,6 @@ DATA_SCHEMA = vol.Schema(
 MENU_OPTION_PANELS = "panels"
 MENU_OPTION_ADD_PANEL = "add_panel"
 MENU_OPTION_USER_CODES = "user_codes"
-MENU_OPTION_FINISH = "finish"
 
 
 def _format_sector_list(sectors: list[int] | None) -> str:
@@ -159,7 +158,6 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 MENU_OPTION_PANELS,
                 MENU_OPTION_ADD_PANEL,
                 MENU_OPTION_USER_CODES,
-                MENU_OPTION_FINISH,
             },
         )
 
@@ -204,6 +202,16 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         return defaults
 
+    def _update_config_entry_options(self) -> None:
+        """Persist the current panel and user code configuration."""
+
+        options = panels_to_options(self._panels)
+        options[OPTION_USER_CODES] = list(self._user_codes)
+        self.hass.config_entries.async_update_entry(
+            self._config_entry,
+            options=options,
+        )
+
     async def async_step_panels(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -214,6 +222,9 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 step_id="panels",
                 data_schema=vol.Schema({}),
                 errors={"base": "no_panels"},
+                description_placeholders={
+                    "max_sector": str(REGISTER_STATUS_COUNT),
+                },
             )
 
         errors: dict[str, str] = {}
@@ -259,6 +270,9 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="panels",
             data_schema=schema,
             errors=errors,
+            description_placeholders={
+                "max_sector": str(REGISTER_STATUS_COUNT),
+            },
         )
 
     async def async_step_panel_edit(
@@ -289,7 +303,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             if user_input.get("remove"):
                 self._panels.pop(index)
                 self._panel_index = None
-                return await self.async_step_panels()
+                self._update_config_entry_options()
+                return await self.async_step_init()
 
             name_input = (user_input.get("name") or "").strip()
             if not name_input:
@@ -338,7 +353,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     "modes": modes,
                 }
                 self._panel_index = None
-                return await self.async_step_panels()
+                self._update_config_entry_options()
+                return await self.async_step_init()
 
         return self.async_show_form(
             step_id="panel_edit",
@@ -363,6 +379,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 errors["codes"] = err.error_message or "invalid_code"
             else:
                 self._user_codes = codes
+                self._update_config_entry_options()
                 return await self.async_step_init()
 
         schema = vol.Schema(
@@ -380,11 +397,3 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             errors=errors,
         )
 
-    async def async_step_finish(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Persist the configured options and close the flow."""
-
-        options = panels_to_options(self._panels)
-        options[OPTION_USER_CODES] = list(self._user_codes)
-        return self.async_create_entry(title="", data=options)
