@@ -64,6 +64,8 @@
          "invalid_sector":"Inserisci numeri di settore nel range supportato.",
          "invalid_slug":"Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
          "duplicate_slug":"Ogni pannello deve avere un suffisso ID entità univoco.",
+         "invalid_panel":"Seleziona un pannello valido da modificare.",
+         "no_panels":"Aggiungi un pannello prima di modificarne la configurazione.",
          "required":"Questo campo è obbligatorio.",
          "duplicate_code":"Ogni codice deve essere univoco.",
          "invalid_code":"Inserisci almeno un codice valido oppure lascia il campo vuoto."

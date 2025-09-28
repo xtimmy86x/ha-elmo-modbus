@@ -64,6 +64,8 @@
          "invalid_sector":"Enter sector numbers within the supported range.",
          "invalid_slug":"Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
          "duplicate_slug":"Each panel must use a unique entity ID suffix.",
+         "invalid_panel":"Select a valid panel to edit.",
+         "no_panels":"Add a panel before editing its configuration.",
          "required":"This field is required.",
          "duplicate_code":"Each code must be unique.",
          "invalid_code":"Enter at least one valid code or leave the field blank."
