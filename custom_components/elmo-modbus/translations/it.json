@@ -2,17 +2,17 @@
    "config":{
       "step":{
          "user":{
-            "title":"Connect to Elmo Alarm",
-            "description":"Enter your Elmo connection details.",
+            "title":"Connessione all'allarme Elmo",
+            "description":"Inserisci i dettagli di connessione del pannello Elmo Modbus.",
             "data":{
-               "name":"Name",
+               "name":"Nome",
                "host":"Host",
-               "port":"Port"
+               "port":"Porta"
             },
             "data_description":{
-               "name":"A friendly name for the PLC (used in entity names).",
-               "host":"IP or hostname of the PLC.",
-               "port":"ISO-on-TCP port, typically 102."
+               "name":"Un nome descrittivo per l'allarme (utilizzato nei nomi delle entità).",
+               "host":"Indirizzo IP o hostname dell'allarme.",
+               "port":"Porta Modbus TCP, solitamente 502."
             }
          }
       }

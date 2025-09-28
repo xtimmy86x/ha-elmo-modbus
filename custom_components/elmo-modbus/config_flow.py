@@ -11,15 +11,29 @@ from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
-from .const import DOMAIN, OPTION_USER_CODES, REGISTER_STATUS_COUNT
+from .const import DEFAULT_NAME, DOMAIN, OPTION_USER_CODES, REGISTER_STATUS_COUNT
 from .panels import MODES, load_panel_definitions, panels_to_options
 
-DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required("host"): str,
-        vol.Required("port", default=502): vol.All(int, vol.Range(min=1, max=65535)),
-    }
-)
+DEFAULT_PORT = 502
+
+
+def _user_step_schema(
+    name: str = DEFAULT_NAME, host: str = "", port: int = DEFAULT_PORT
+) -> vol.Schema:
+    """Return the schema for the initial configuration step."""
+
+    return vol.Schema(
+        {
+            vol.Required("name", default=name or DEFAULT_NAME): str,
+            vol.Required("host", default=host): str,
+            vol.Required("port", default=port): vol.All(
+                int, vol.Range(min=1, max=65535)
+            ),
+        }
+    )
+
+
+DATA_SCHEMA = _user_step_schema()
 
 MENU_OPTION_PANELS = "panels"
 MENU_OPTION_ADD_PANEL = "add_panel"
@@ -91,18 +105,47 @@ def _parse_user_code_input(value: str) -> list[str]:
 
 class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the configuration flow for the Elmo Modbus integration."""
-
+    
     VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, str] | None = None
     ) -> FlowResult:
         """Handle the initial step where the user enters connection details."""
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            await self.async_set_unique_id(f"{user_input['host']}:{user_input['port']}")
+            raw_name = (user_input.get("name") or "").strip()
+            raw_host = (user_input.get("host") or "").strip()
+            port = user_input.get("port", DEFAULT_PORT)
+
+            if not raw_host:
+                errors["host"] = "required"
+
+            name = raw_name or DEFAULT_NAME
+
+            if errors:
+                schema = _user_step_schema(
+                    name=raw_name or DEFAULT_NAME,
+                    host=user_input.get("host", ""),
+                    port=port,
+                )
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=schema,
+                    errors=errors,
+                )
+
+            await self.async_set_unique_id(f"{raw_host}:{port}")
             self._abort_if_unique_id_configured()
 
-            return self.async_create_entry(title=user_input["host"], data=user_input)
+            data = {
+                "name": name,
+                "host": raw_host,
+                "port": port,
+            }
+
+            return self.async_create_entry(title=name, data=data)
 
         return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
 

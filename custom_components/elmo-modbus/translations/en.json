@@ -2,17 +2,17 @@
    "config":{
       "step":{
          "user":{
-            "title":"Connect to Elmo Alarm",
-            "description":"Enter your Elmo connection details.",
+            "title":"Connect to Elmo alarm",
+            "description":"Enter the connection details for your Elmo Modbus panel.",
             "data":{
                "name":"Name",
                "host":"Host",
                "port":"Port"
             },
             "data_description":{
-               "name":"A friendly name for the PLC (used in entity names).",
-               "host":"IP or hostname of the PLC.",
-               "port":"ISO-on-TCP port, typically 102."
+               "name":"A friendly name for the Alarm (used in entity names).",
+               "host":"IP or hostname of the Alarm.",
+               "port":"Modbus TCP port, typically 502."
             }
          }
       }
