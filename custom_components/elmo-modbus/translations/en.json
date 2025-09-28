@@ -1,55 +1,72 @@
 {
-  "options": {
-    "step": {
-      "init": {
-        "title": "Elmo Modbus options",
-        "menu_options": {
-          "panels": "Configure panels",
-          "add_panel": "Add panel",
-          "user_codes": "Manage user codes",
-          "finish": "Save changes"
-        }
-      },
-      "panels": {
-        "title": "Select panel",
-        "description": "Choose the panel to edit. Use the options menu to add a new panel if needed.",
-        "data": {
-          "panel": "Panel"
-        }
-      },
-      "panel_edit": {
-        "title": "Edit panel",
-        "description": "Assign alarm sectors to each arming mode for {panel_name}. Sectors must be between 1 and {max_sector}.",
-        "data": {
-          "name": "Panel name",
-          "entity_id_suffix": "Entity ID suffix",
-          "away": "Away mode sectors",
-          "home": "Home mode sectors",
-          "night": "Night mode sectors",
-          "remove": "Remove this panel"
-        },
-        "data_description": {
-          "entity_id_suffix": "Optional suffix appended to the alarm panel entity ID.",
-          "away": "Provide a comma-separated list of sectors to arm when using away mode.",
-          "home": "Provide a comma-separated list of sectors to arm when using home mode.",
-          "night": "Provide a comma-separated list of sectors to arm when using night mode."
-        }
-      },
-      "user_codes": {
-        "title": "User codes",
-        "description": "Enter one code per line. Leave empty to disable code verification.",
-        "data": {
-          "codes": "Codes"
-        }
+   "config":{
+      "step":{
+         "user":{
+            "title":"Connect to Elmo Alarm",
+            "description":"Enter your Elmo connection details.",
+            "data":{
+               "name":"Name",
+               "host":"Host",
+               "port":"Port"
+            },
+            "data_description":{
+               "name":"A friendly name for the PLC (used in entity names).",
+               "host":"IP or hostname of the PLC.",
+               "port":"ISO-on-TCP port, typically 102."
+            }
+         }
       }
-    },
-    "error": {
-      "invalid_sector": "Enter sector numbers within the supported range.",
-      "invalid_slug": "Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
-      "duplicate_slug": "Each panel must use a unique entity ID suffix.",
-      "required": "This field is required.",
-      "duplicate_code": "Each code must be unique.",
-      "invalid_code": "Enter at least one valid code or leave the field blank."
-    }
-  }
+   },
+   "options":{
+      "step":{
+         "init":{
+            "title":"Elmo Modbus options",
+            "menu_options":{
+               "panels":"Configure panels",
+               "add_panel":"Add panel",
+               "user_codes":"Manage user codes"
+            }
+         },
+         "panels":{
+            "title":"Select panel",
+            "description":"Choose the panel to edit. Use the options menu to add a new panel if needed.",
+            "data":{
+               "panel":"Panel"
+            }
+         },
+         "panel_edit":{
+            "title":"Edit panel",
+            "description":"Assign alarm sectors to each arming mode for {panel_name}. Sectors must be between 1 and {max_sector}.",
+            "data":{
+               "name":"Panel name",
+               "entity_id_suffix":"Entity ID suffix",
+               "away":"Away mode sectors",
+               "home":"Home mode sectors",
+               "night":"Night mode sectors",
+               "remove":"Remove this panel"
+            },
+            "data_description":{
+               "entity_id_suffix":"Optional suffix appended to the alarm panel entity ID.",
+               "away":"Provide a comma-separated list of sectors to arm when using away mode.",
+               "home":"Provide a comma-separated list of sectors to arm when using home mode.",
+               "night":"Provide a comma-separated list of sectors to arm when using night mode."
+            }
+         },
+         "user_codes":{
+            "title":"User codes",
+            "description":"Enter one code per line. Leave empty to disable code verification.",
+            "data":{
+               "codes":"Codes"
+            }
+         }
+      },
+      "error":{
+         "invalid_sector":"Enter sector numbers within the supported range.",
+         "invalid_slug":"Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
+         "duplicate_slug":"Each panel must use a unique entity ID suffix.",
+         "required":"This field is required.",
+         "duplicate_code":"Each code must be unique.",
+         "invalid_code":"Enter at least one valid code or leave the field blank."
+      }
+   }
 }

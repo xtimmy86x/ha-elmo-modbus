@@ -1,55 +1,72 @@
 {
-  "options": {
-    "step": {
-      "init": {
-        "title": "Opzioni Elmo Modbus",
-        "menu_options": {
-          "panels": "Configura pannelli",
-          "add_panel": "Aggiungi pannello",
-          "user_codes": "Gestisci codici utente",
-          "finish": "Salva modifiche"
-        }
-      },
-      "panels": {
-        "title": "Seleziona pannello",
-        "description": "Scegli il pannello da modificare. Usa il menu opzioni per aggiungere un nuovo pannello se necessario.",
-        "data": {
-          "panel": "Pannello"
-        }
-      },
-      "panel_edit": {
-        "title": "Modifica pannello",
-        "description": "Assegna i settori di allarme a ciascuna modalità di inserimento per {panel_name}. I settori devono essere compresi tra 1 e {max_sector}.",
-        "data": {
-          "name": "Nome pannello",
-          "entity_id_suffix": "Suffisso ID entità",
-          "away": "Settori modalità away",
-          "home": "Settori modalità home",
-          "night": "Settori modalità night",
-          "remove": "Rimuovi questo pannello"
-        },
-        "data_description": {
-          "entity_id_suffix": "Suffisso opzionale aggiunto all’ID entità del pannello di allarme.",
-          "away": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità away.",
-          "home": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità home.",
-          "night": "Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità night."
-        }
-      },
-      "user_codes": {
-        "title": "Codici utente",
-        "description": "Inserisci un codice per riga. Lascia vuoto per disabilitare la verifica del codice.",
-        "data": {
-          "codes": "Codici"
-        }
+   "config":{
+      "step":{
+         "user":{
+            "title":"Connect to Elmo Alarm",
+            "description":"Enter your Elmo connection details.",
+            "data":{
+               "name":"Name",
+               "host":"Host",
+               "port":"Port"
+            },
+            "data_description":{
+               "name":"A friendly name for the PLC (used in entity names).",
+               "host":"IP or hostname of the PLC.",
+               "port":"ISO-on-TCP port, typically 102."
+            }
+         }
       }
-    },
-    "error": {
-      "invalid_sector": "Inserisci numeri di settore nel range supportato.",
-      "invalid_slug": "Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
-      "duplicate_slug": "Ogni pannello deve avere un suffisso ID entità univoco.",
-      "required": "Questo campo è obbligatorio.",
-      "duplicate_code": "Ogni codice deve essere univoco.",
-      "invalid_code": "Inserisci almeno un codice valido oppure lascia il campo vuoto."
-    }
-  }
+   },
+   "options":{
+      "step":{
+         "init":{
+            "title":"Opzioni Elmo Modbus",
+            "menu_options":{
+               "panels":"Configura pannelli",
+               "add_panel":"Aggiungi pannello",
+               "user_codes":"Gestisci codici utente"
+            }
+         },
+         "panels":{
+            "title":"Seleziona pannello",
+            "description":"Scegli il pannello da modificare. Usa il menu opzioni per aggiungere un nuovo pannello se necessario.",
+            "data":{
+               "panel":"Pannello"
+            }
+         },
+         "panel_edit":{
+            "title":"Modifica pannello",
+            "description":"Assegna i settori di allarme a ciascuna modalità di inserimento per {panel_name}. I settori devono essere compresi tra 1 e {max_sector}.",
+            "data":{
+               "name":"Nome pannello",
+               "entity_id_suffix":"Suffisso ID entità",
+               "away":"Settori modalità away",
+               "home":"Settori modalità home",
+               "night":"Settori modalità night",
+               "remove":"Rimuovi questo pannello"
+            },
+            "data_description":{
+               "entity_id_suffix":"Suffisso opzionale aggiunto all’ID entità del pannello di allarme.",
+               "away":"Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità away.",
+               "home":"Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità home.",
+               "night":"Fornisci un elenco separato da virgole dei settori da inserire quando si usa la modalità night."
+            }
+         },
+         "user_codes":{
+            "title":"Codici utente",
+            "description":"Inserisci un codice per riga. Lascia vuoto per disabilitare la verifica del codice.",
+            "data":{
+               "codes":"Codici"
+            }
+         }
+      },
+      "error":{
+         "invalid_sector":"Inserisci numeri di settore nel range supportato.",
+         "invalid_slug":"Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
+         "duplicate_slug":"Ogni pannello deve avere un suffisso ID entità univoco.",
+         "required":"Questo campo è obbligatorio.",
+         "duplicate_code":"Ogni codice deve essere univoco.",
+         "invalid_code":"Inserisci almeno un codice valido oppure lascia il campo vuoto."
+      }
+   }
 }

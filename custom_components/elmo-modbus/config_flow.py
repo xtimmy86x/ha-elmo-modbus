@@ -173,7 +173,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 "modes": {},
             }
         )
-        return await self.async_step_panels()
+        self._panel_index = len(self._panels) - 1
+        return await self.async_step_panel_edit()
 
     def _panel_form_defaults(
         self, index: int, user_input: dict[str, Any] | None
