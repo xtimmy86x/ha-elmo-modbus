@@ -25,7 +25,9 @@ LEGACY_OPTION_MAP = {
 MODES: tuple[str, ...] = tuple(LEGACY_OPTION_MAP)
 
 
-def _sanitize_sectors(values: Iterable[Any] | None) -> set[int]:
+def _sanitize_sectors(
+    values: Iterable[Any] | None, *, max_sector: int = REGISTER_STATUS_COUNT
+) -> set[int]:
     """Return a sanitised set of sector identifiers."""
 
     result: set[int] = set()
@@ -37,7 +39,7 @@ def _sanitize_sectors(values: Iterable[Any] | None) -> set[int]:
             sector = int(value)
         except (TypeError, ValueError):
             continue
-        if 1 <= sector <= REGISTER_STATUS_COUNT:
+        if 1 <= sector <= max_sector:
             result.add(sector)
 
     return result
@@ -95,7 +97,12 @@ class PanelDefinition:
 
     @classmethod
     def from_storage(
-        cls, raw: Mapping[str, Any], *, used_slugs: set[str], default_index: int
+        cls,
+        raw: Mapping[str, Any],
+        *,
+        used_slugs: set[str],
+        default_index: int,
+        max_sector: int = REGISTER_STATUS_COUNT,
     ) -> PanelDefinition:
         """Create a panel definition from stored options."""
 
@@ -109,7 +116,9 @@ class PanelDefinition:
         modes_data = raw.get("modes", {})
         modes: dict[str, set[int]] = {}
         for mode in MODES:
-            sectors = _sanitize_sectors(modes_data.get(mode))
+            sectors = _sanitize_sectors(
+                modes_data.get(mode), max_sector=max_sector
+            )
             if sectors:
                 modes[mode] = sectors
 
@@ -117,7 +126,11 @@ class PanelDefinition:
 
     @classmethod
     def from_legacy(
-        cls, options: Mapping[str, Any], *, used_slugs: set[str]
+        cls,
+        options: Mapping[str, Any],
+        *,
+        used_slugs: set[str],
+        max_sector: int = REGISTER_STATUS_COUNT,
     ) -> PanelDefinition:
         """Create a panel definition from legacy options."""
 
@@ -126,16 +139,20 @@ class PanelDefinition:
 
         modes: dict[str, set[int]] = {}
         for mode, option_key in LEGACY_OPTION_MAP.items():
-            sectors = _sanitize_sectors(options.get(option_key))
+            sectors = _sanitize_sectors(
+                options.get(option_key), max_sector=max_sector
+            )
             if sectors:
                 modes[mode] = sectors
 
-        disarm_sectors = _sanitize_sectors(options.get(OPTION_DISARM_SECTORS))
+        disarm_sectors = _sanitize_sectors(
+            options.get(OPTION_DISARM_SECTORS), max_sector=max_sector
+        )
 
         if not modes:
             # Old behaviour armed all sectors when
             # no specific configuration was provided.
-            modes["away"] = set(range(1, REGISTER_STATUS_COUNT + 1))
+            modes["away"] = set(range(1, max_sector + 1))
 
         if disarm_sectors:
             extra = disarm_sectors - modes.get("away", set())
@@ -150,7 +167,9 @@ class PanelDefinition:
         )
 
 
-def load_panel_definitions(options: Mapping[str, Any]) -> list[PanelDefinition]:
+def load_panel_definitions(
+    options: Mapping[str, Any], *, max_sector: int = REGISTER_STATUS_COUNT
+) -> list[PanelDefinition]:
     """Return the configured panels for the given options mapping."""
 
     used_slugs: set[str] = set()
@@ -163,16 +182,25 @@ def load_panel_definitions(options: Mapping[str, Any]) -> list[PanelDefinition]:
                 if isinstance(raw, Mapping):
                     panels.append(
                         PanelDefinition.from_storage(
-                            raw, used_slugs=used_slugs, default_index=index
+                            raw,
+                            used_slugs=used_slugs,
+                            default_index=index,
+                            max_sector=max_sector,
                         )
                     )
         return panels
 
     # Legacy single-panel configuration.
-    return [PanelDefinition.from_legacy(options, used_slugs=used_slugs)]
+    return [
+        PanelDefinition.from_legacy(
+            options, used_slugs=used_slugs, max_sector=max_sector
+        )
+    ]
 
 
-def panels_to_options(raw_panels: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def panels_to_options(
+    raw_panels: Sequence[Mapping[str, Any]], *, max_sector: int = REGISTER_STATUS_COUNT
+) -> dict[str, Any]:
     """Normalise user-provided panels and return the options payload."""
 
     used_slugs: set[str] = set()
@@ -188,7 +216,9 @@ def panels_to_options(raw_panels: Sequence[Mapping[str, Any]]) -> dict[str, Any]
         modes: dict[str, set[int]] = {}
         modes_data = raw.get("modes", {})
         for mode in MODES:
-            sectors = _sanitize_sectors(modes_data.get(mode))
+            sectors = _sanitize_sectors(
+                modes_data.get(mode), max_sector=max_sector
+            )
             if sectors:
                 modes[mode] = sectors
 

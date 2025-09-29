@@ -64,7 +64,7 @@ def _format_sector_list(sectors: list[int] | None) -> str:
     return ", ".join(str(sector) for sector in sectors)
 
 
-def _parse_sector_input(value: str) -> list[int]:
+def _parse_sector_input(value: str, *, max_sector: int) -> list[int]:
     """Parse the user provided string into a sorted list of valid sectors."""
 
     if not value:
@@ -80,7 +80,7 @@ def _parse_sector_input(value: str) -> list[int]:
         except ValueError as err:
             raise vol.Invalid("invalid_sector") from err
 
-        if sector < 1 or sector > REGISTER_STATUS_COUNT:
+        if sector < 1 or sector > max_sector:
             raise vol.Invalid("invalid_sector")
         if sector in seen:
             continue
@@ -188,7 +188,11 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         """Initialise the options flow."""
 
         self._config_entry = config_entry
-        definitions = load_panel_definitions(config_entry.options)
+        sector_limit = int(config_entry.data.get(CONF_SECTORS, REGISTER_STATUS_COUNT))
+        self._sector_limit = max(1, min(sector_limit, REGISTER_STATUS_COUNT))
+        definitions = load_panel_definitions(
+            config_entry.options, max_sector=self._sector_limit
+        )
         self._panels: list[dict[str, Any]] = []
         self._panel_index: int | None = None
         for panel in definitions:
@@ -271,7 +275,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
     def _update_config_entry_options(self) -> None:
         """Persist the current panel and user code configuration."""
 
-        options = panels_to_options(self._panels)
+        options = panels_to_options(self._panels, max_sector=self._sector_limit)
         options[OPTION_USER_CODES] = list(self._user_codes)
         self.hass.config_entries.async_update_entry(
             self._config_entry,
@@ -289,7 +293,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 data_schema=vol.Schema({}),
                 errors={"base": "no_panels"},
                 description_placeholders={
-                    "max_sector": str(REGISTER_STATUS_COUNT),
+                    "max_sector": str(self._sector_limit),
                 },
             )
 
@@ -337,7 +341,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=schema,
             errors=errors,
             description_placeholders={
-                "max_sector": str(REGISTER_STATUS_COUNT),
+                "max_sector": str(self._sector_limit),
             },
         )
 
@@ -391,7 +395,9 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             modes: dict[str, list[int]] = {}
             for mode in MODES:
                 try:
-                    sectors = _parse_sector_input(user_input.get(mode, ""))
+                    sectors = _parse_sector_input(
+                        user_input.get(mode, ""), max_sector=self._sector_limit
+                    )
                 except vol.Invalid:
                     errors[mode] = "invalid_sector"
                     sectors = panel.get("modes", {}).get(mode, [])
@@ -428,7 +434,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             errors=errors,
             description_placeholders={
                 "panel_name": panel.get("name", f"Panel {index + 1}"),
-                "max_sector": str(REGISTER_STATUS_COUNT),
+                "max_sector": str(self._sector_limit),
             },
         )
 

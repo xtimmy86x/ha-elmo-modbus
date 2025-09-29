@@ -22,8 +22,7 @@ from .const import (
     DOMAIN,
     OPTION_USER_CODES,
     REGISTER_COMMAND_COUNT,
-    REGISTER_COMMAND_START,
-    REGISTER_STATUS_COUNT,
+    REGISTER_COMMAND_START
 )
 from .coordinator import ElmoModbusCoordinator
 from .panels import MODES, PanelDefinition, load_panel_definitions
@@ -56,7 +55,9 @@ async def async_setup_entry(
     coordinator: ElmoModbusCoordinator = data["coordinator"]
     client: ModbusTcpClient = data["client"]
 
-    panels = load_panel_definitions(entry.options)
+    panels = load_panel_definitions(
+        entry.options, max_sector=coordinator.sector_count
+    )
     entities = [
         ElmoModbusAlarmControlPanel(entry, coordinator, client, panel)
         for panel in panels
@@ -124,7 +125,7 @@ class ElmoModbusAlarmControlPanel(
     def _all_sectors(self) -> set[int]:
         """Return a set with all known sector numbers."""
 
-        return {index + 1 for index in range(REGISTER_STATUS_COUNT)}
+        return {index + 1 for index in range(self.coordinator.sector_count)}
 
     def _require_valid_code(self, code: str | None) -> None:
         """Ensure the provided code is valid when codes are configured."""

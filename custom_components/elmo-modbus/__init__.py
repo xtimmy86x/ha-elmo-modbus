@@ -9,7 +9,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 from pymodbus.client import ModbusTcpClient
 
-from .const import DOMAIN, PLATFORMS
+from .const import (
+    CONF_SCAN_INTERVAL,
+    CONF_SECTORS,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SECTORS,
+    DOMAIN,
+    PLATFORMS,
+)
 from .coordinator import ElmoModbusCoordinator
 
 
@@ -23,7 +30,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     client = ModbusTcpClient(host=entry.data["host"], port=entry.data["port"])
-    coordinator = ElmoModbusCoordinator(hass, client)
+    scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    sector_count = entry.data.get(CONF_SECTORS, DEFAULT_SECTORS)
+
+    coordinator = ElmoModbusCoordinator(
+        hass,
+        client,
+        sector_count=sector_count,
+        scan_interval=scan_interval,
+    )
 
     await coordinator.async_config_entry_first_refresh()
 
