@@ -166,7 +166,7 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_SCAN_INTERVAL: scan_interval,
                 CONF_SECTORS: sectors,
             }
-            _LOGGER.warning("Creating config entry with data: %s", data)
+            _LOGGER.debug("Creating config entry with data: %s", data)
             return self.async_create_entry(title=name, data=data)
 
         return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
