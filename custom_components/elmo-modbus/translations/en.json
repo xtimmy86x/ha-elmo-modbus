@@ -7,12 +7,15 @@
             "data":{
                "name":"Name",
                "host":"Host",
-               "port":"Port"
+               "port":"Port",
+               "scan_interval":"Scan interval (seconds)",
+               "sectors":"Number of sectors"
             },
             "data_description":{
                "name":"A friendly name for the Alarm (used in entity names).",
                "host":"IP or hostname of the Alarm.",
-               "port":"Modbus TCP port, typically 502."
+               "port":"Modbus TCP port, typically 502.",
+               "scan_interval":"Time interval in seconds between alarm state scans."
             }
          }
       }

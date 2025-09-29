@@ -7,12 +7,15 @@
             "data":{
                "name":"Nome",
                "host":"Host",
-               "port":"Porta"
+               "port":"Porta",
+               "scan_interval":"Intervallo di scansione (secondi)",
+               "sectors":"Numero di settori"
             },
             "data_description":{
                "name":"Un nome descrittivo per l'allarme (utilizzato nei nomi delle entità).",
                "host":"Indirizzo IP o hostname dell'allarme.",
-               "port":"Porta Modbus TCP, solitamente 502."
+               "port":"Porta Modbus TCP, solitamente 502.",
+               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme."
             }
          }
       }
