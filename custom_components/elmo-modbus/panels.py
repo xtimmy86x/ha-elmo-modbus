@@ -116,9 +116,7 @@ class PanelDefinition:
         modes_data = raw.get("modes", {})
         modes: dict[str, set[int]] = {}
         for mode in MODES:
-            sectors = _sanitize_sectors(
-                modes_data.get(mode), max_sector=max_sector
-            )
+            sectors = _sanitize_sectors(modes_data.get(mode), max_sector=max_sector)
             if sectors:
                 modes[mode] = sectors
 
@@ -139,9 +137,7 @@ class PanelDefinition:
 
         modes: dict[str, set[int]] = {}
         for mode, option_key in LEGACY_OPTION_MAP.items():
-            sectors = _sanitize_sectors(
-                options.get(option_key), max_sector=max_sector
-            )
+            sectors = _sanitize_sectors(options.get(option_key), max_sector=max_sector)
             if sectors:
                 modes[mode] = sectors
 
@@ -216,9 +212,7 @@ def panels_to_options(
         modes: dict[str, set[int]] = {}
         modes_data = raw.get("modes", {})
         for mode in MODES:
-            sectors = _sanitize_sectors(
-                modes_data.get(mode), max_sector=max_sector
-            )
+            sectors = _sanitize_sectors(modes_data.get(mode), max_sector=max_sector)
             if sectors:
                 modes[mode] = sectors
 

@@ -1,6 +1,7 @@
 """Config flow for the Elmo Modbus integration."""
 
 from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -12,20 +13,21 @@ from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
-    CONF_SECTORS,
     CONF_SCAN_INTERVAL,
+    CONF_SECTORS,
     DEFAULT_NAME,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SECTORS,
     DOMAIN,
     OPTION_USER_CODES,
-    REGISTER_STATUS_COUNT
+    REGISTER_STATUS_COUNT,
 )
 from .panels import MODES, load_panel_definitions, panels_to_options
 
 DEFAULT_PORT = 502
 
 _LOGGER = logging.getLogger(__name__)
+
 
 def _user_step_schema(
     name: str = DEFAULT_NAME, host: str = "", port: int = DEFAULT_PORT
@@ -38,10 +40,10 @@ def _user_step_schema(
             vol.Required("host", default=host): str,
             vol.Required("port", default=port): vol.All(
                 int, vol.Range(min=1, max=65535)
-                ),
+            ),
             vol.Required("scan_interval", default=DEFAULT_SCAN_INTERVAL): vol.All(
                 int, vol.Range(min=1, max=3600)
-                ),
+            ),
             vol.Required("sectors", default=DEFAULT_SECTORS): vol.All(
                 int, vol.Range(min=1, max=DEFAULT_SECTORS)
             ),
@@ -121,7 +123,7 @@ def _parse_user_code_input(value: str) -> list[str]:
 
 class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the configuration flow for the Elmo Modbus integration."""
-    
+
     VERSION = 1
 
     async def async_step_user(
@@ -323,9 +325,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     "panel",
                     default=(
-                        str(self._panel_index)
-                        if self._panel_index is not None
-                        else "0"
+                        str(self._panel_index) if self._panel_index is not None else "0"
                     ),
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
@@ -359,9 +359,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         defaults = self._panel_form_defaults(index, user_input)
         schema_dict: dict[Any, Any] = {
             vol.Required("name", default=defaults["name"]): str,
-            vol.Optional(
-                "entity_id_suffix", default=defaults["entity_id_suffix"]
-            ): str,
+            vol.Optional("entity_id_suffix", default=defaults["entity_id_suffix"]): str,
         }
         for mode in MODES:
             schema_dict[vol.Optional(mode, default=defaults[mode])] = str
@@ -382,9 +380,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             name_value = name_input or panel.get("name", f"Panel {index + 1}")
 
             slug_input = (user_input.get("entity_id_suffix") or "").strip()
-            slug_candidate = (
-                slugify(slug_input) if slug_input else slugify(name_value)
-            )
+            slug_candidate = slugify(slug_input) if slug_input else slugify(name_value)
             if not slug_candidate:
                 errors["entity_id_suffix"] = "invalid_slug"
                 slug_candidate = (
@@ -468,4 +464,3 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=schema,
             errors=errors,
         )
-

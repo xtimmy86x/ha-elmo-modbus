@@ -22,7 +22,7 @@ from .const import (
     DOMAIN,
     OPTION_USER_CODES,
     REGISTER_COMMAND_COUNT,
-    REGISTER_COMMAND_START
+    REGISTER_COMMAND_START,
 )
 from .coordinator import ElmoModbusCoordinator
 from .panels import MODES, PanelDefinition, load_panel_definitions
@@ -55,9 +55,7 @@ async def async_setup_entry(
     coordinator: ElmoModbusCoordinator = data["coordinator"]
     client: ModbusTcpClient = data["client"]
 
-    panels = load_panel_definitions(
-        entry.options, max_sector=coordinator.sector_count
-    )
+    panels = load_panel_definitions(entry.options, max_sector=coordinator.sector_count)
     entities = [
         ElmoModbusAlarmControlPanel(entry, coordinator, client, panel)
         for panel in panels

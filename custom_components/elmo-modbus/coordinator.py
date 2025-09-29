@@ -10,11 +10,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
-from .const import (
-    DEFAULT_SCAN_INTERVAL,
-    REGISTER_STATUS_COUNT,
-    REGISTER_STATUS_START,
-)
+from .const import DEFAULT_SCAN_INTERVAL, REGISTER_STATUS_COUNT, REGISTER_STATUS_START
 
 LOGGER = logging.getLogger(__name__)
 
@@ -82,4 +78,3 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
         """Return the number of sectors handled by this coordinator."""
 
         return self._sector_count
-    
