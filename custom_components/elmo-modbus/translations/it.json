@@ -73,5 +73,89 @@
          "duplicate_code":"Ogni codice deve essere univoco.",
          "invalid_code":"Inserisci almeno un codice valido oppure lascia il campo vuoto."
       }
+   },
+   "entity":{
+      "binary_sensor":{
+         "central_power_fault":{
+            "name":"Anomalia alimentazione centrale",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "central_battery_fault":{
+            "name":"Anomalia batteria centrale",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "central_tamper_fault":{
+            "name":"Anomalia tamper centrale",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "pstn_fault":{
+            "name":"Anomalia PSTN",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "cellular_fault":{
+            "name":"Anomalia GSM/LTE",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "sensor_power_fault_1":{
+            "name":"Anomalia alimentazione sensori 1",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "sensor_power_fault_2":{
+            "name":"Anomalia alimentazione sensori 2",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "siren_power_fault":{
+            "name":"Anomalia alimentazione sirena",
+            "state_on":"Anomalia",
+            "state_off":"Normale"
+         },
+         "central_general_alarm":{
+            "name":"Allarme generale centrale",
+            "state_on":"Allarme",
+            "state_off":"Nessun allarme"
+         },
+         "central_general_tamper":{
+            "name":"Manomissione generale centrale",
+            "state_on":"Manomissione",
+            "state_off":"Assente"
+         },
+         "sectors_not_armable":{
+            "name":"Settori non inseribili",
+            "state_on":"Sì",
+            "state_off":"No"
+         },
+         "sectors_inserted":{
+            "name":"Settori inseriti",
+            "state_on":"Sì",
+            "state_off":"No"
+         },
+         "sectors_inserted_max_security":{
+            "name":"Settori inseriti in massima sicurezza",
+            "state_on":"Sì",
+            "state_off":"No"
+         },
+         "sectors_inputs_alarm":{
+            "name":"Settori con ingressi in allamrme",
+            "state_on":"Sì",
+            "state_off":"No"
+         },
+         "sectors_inputs_memory_alarm":{
+            "name":"Settori con ingressi in memoria allamrme",
+            "state_on":"Sì",
+            "state_off":"No"
+         },
+         "excluded_zones":{
+            "name":"Ingressi esclusi",
+            "state_on":"Sì",
+            "state_off":"No"
+         }
+      }
    }
 }

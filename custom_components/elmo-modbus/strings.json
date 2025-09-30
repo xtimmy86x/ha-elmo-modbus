@@ -73,5 +73,89 @@
          "duplicate_code":"Each code must be unique.",
          "invalid_code":"Enter at least one valid code or leave the field blank."
       }
+   },
+   "entity":{
+      "binary_sensor":{
+         "central_power_fault":{
+            "name":"Control panel power fault",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "central_battery_fault":{
+            "name":"Control panel battery fault",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "central_tamper_fault":{
+            "name":"Control panel tamper fault",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "pstn_fault":{
+            "name":"PSTN fault",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "cellular_fault":{
+            "name":"Cellular fault",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "sensor_power_fault_1":{
+            "name":"Sensor supply fault 1",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "sensor_power_fault_2":{
+            "name":"Sensor supply fault 2",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "siren_power_fault":{
+            "name":"Siren supply fault",
+            "state_on":"Fault",
+            "state_off":"Normal"
+         },
+         "central_alarm":{
+            "name":"General control panel alarm",
+            "state_on":"Alarm",
+            "state_off":"No alarm"
+         },
+         "central_general_tamper":{
+            "name":"General control panel tamper",
+            "state_on":"Tamper",
+            "state_off":"Clear"
+         },
+         "sectors_not_armable":{
+            "name":"Sectors not armable",
+            "state_on":"Yes",
+            "state_off":"No"
+         },
+         "sectors_inserted":{
+            "name":"Sectors inserted",
+            "state_on":"Yes",
+            "state_off":"No"
+         },
+         "sectors_inserted_max_security":{
+            "name":"Sectors inserted in maximum security",
+            "state_on":"Yes",
+            "state_off":"No"
+         },
+         "sectors_inputs_alarm":{
+            "name":"Sectors with alarmed inputs",
+            "state_on":"Yes",
+            "state_off":"No"
+         },
+         "sectors_inputs_memory_alarm":{
+            "name":"SSectors with alarmed memory inputs",
+            "state_on":"Yes",
+            "state_off":"No"
+         },
+         "excluded_zones":{
+            "name":"Excluded zones",
+            "state_on":"Yes",
+            "state_off":"No"
+         }
+      }
    }
 }
