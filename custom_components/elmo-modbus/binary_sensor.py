@@ -26,6 +26,7 @@ from .const import (
     INPUT_SENSOR_START,
 )
 from .coordinator import ElmoModbusBinarySensorCoordinator
+from .input_selectors import normalize_input_sensor_config
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -157,8 +158,15 @@ async def async_setup_entry(
         "binary_coordinator"
     )
 
-    input_sensor_count = entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
-    input_sensor_total = max(1, min(int(input_sensor_count), INPUT_SENSOR_COUNT))
+    raw_input_sensors = entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
+    input_sensor_ids = normalize_input_sensor_config(
+        raw_input_sensors, max_input=INPUT_SENSOR_COUNT
+    )
+
+    if not input_sensor_ids:
+        fallback_limit = min(DEFAULT_INPUT_SENSORS, INPUT_SENSOR_COUNT)
+        input_sensor_ids = list(range(1, fallback_limit + 1))
+
     input_descriptions = [
         ElmoBinarySensorDescription(
             key=f"alarm_input_{index}",
@@ -167,7 +175,7 @@ async def async_setup_entry(
             address=INPUT_SENSOR_START + index - 1,
             device_class=BinarySensorDeviceClass.SAFETY,
         )
-        for index in range(1, input_sensor_total + 1)
+        for index in input_sensor_ids
     ]
 
     descriptions = [*BASE_SENSOR_DESCRIPTIONS, *input_descriptions]

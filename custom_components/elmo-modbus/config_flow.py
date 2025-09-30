@@ -25,6 +25,11 @@ from .const import (
     OPTION_USER_CODES,
     REGISTER_STATUS_COUNT,
 )
+from .input_selectors import (
+    format_input_sensor_list,
+    normalize_input_sensor_config,
+    parse_input_sensor_selection,
+)
 from .panels import MODES, load_panel_definitions, panels_to_options
 
 DEFAULT_PORT = 502
@@ -39,9 +44,17 @@ def _user_step_schema(
     *,
     scan_interval: int = DEFAULT_SCAN_INTERVAL,
     sectors: int = DEFAULT_SECTORS,
-    input_sensors: int = DEFAULT_INPUT_SENSORS,
+    input_sensors: Any = DEFAULT_INPUT_SENSORS,
 ) -> vol.Schema:
     """Return the schema for the initial configuration step."""
+
+    if isinstance(input_sensors, str):
+        input_default = input_sensors
+    else:
+        normalized = normalize_input_sensor_config(
+            input_sensors, max_input=INPUT_SENSOR_COUNT
+        )
+        input_default = format_input_sensor_list(normalized)
 
     return vol.Schema(
         {
@@ -56,9 +69,7 @@ def _user_step_schema(
             vol.Required("sectors", default=sectors): vol.All(
                 int, vol.Range(min=1, max=DEFAULT_SECTORS)
             ),
-            vol.Required(CONF_INPUT_SENSORS, default=input_sensors): vol.All(
-                int, vol.Range(min=1, max=INPUT_SENSOR_COUNT)
-            ),
+            vol.Required(CONF_INPUT_SENSORS, default=input_default or ""): str,
         }
     )
 
@@ -151,7 +162,14 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             port = user_input.get("port", DEFAULT_PORT)
             scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
             sectors = user_input.get("sectors", DEFAULT_SECTORS)
-            input_sensors = user_input.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
+            raw_input_sensors = user_input.get(CONF_INPUT_SENSORS, "")
+            try:
+                input_sensors = parse_input_sensor_selection(
+                    raw_input_sensors, max_input=INPUT_SENSOR_COUNT
+                )
+            except ValueError:
+                errors[CONF_INPUT_SENSORS] = "invalid_input"
+                input_sensors = []
 
             if not raw_host:
                 errors["host"] = "required"
@@ -165,7 +183,7 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     port=port,
                     scan_interval=scan_interval,
                     sectors=sectors,
-                    input_sensors=input_sensors,
+                    input_sensors=raw_input_sensors,
                 )
                 return self.async_show_form(
                     step_id="user",
@@ -260,7 +278,14 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         default_port = current_data.get("port", DEFAULT_PORT)
         default_scan = current_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         default_sectors = current_data.get(CONF_SECTORS, self._sector_limit)
-        default_inputs = current_data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
+        default_inputs = normalize_input_sensor_config(
+            current_data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS),
+            max_input=INPUT_SENSOR_COUNT,
+        )
+        if not default_inputs:
+            default_inputs = normalize_input_sensor_config(
+                DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
+            )
 
         errors: dict[str, str] = {}
 
@@ -270,7 +295,14 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             port = user_input.get("port", DEFAULT_PORT)
             scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
             sectors = user_input.get("sectors", default_sectors)
-            input_sensors = user_input.get(CONF_INPUT_SENSORS, default_inputs)
+            raw_input_sensors = user_input.get(CONF_INPUT_SENSORS, "")
+            try:
+                input_sensors = parse_input_sensor_selection(
+                    raw_input_sensors, max_input=INPUT_SENSOR_COUNT
+                )
+            except ValueError:
+                errors[CONF_INPUT_SENSORS] = "invalid_input"
+                input_sensors = default_inputs
 
             if not raw_host:
                 errors["host"] = "required"
@@ -334,7 +366,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 port=port,
                 scan_interval=scan_interval,
                 sectors=sectors,
-                input_sensors=input_sensors,
+                input_sensors=raw_input_sensors,
             )
         else:
             schema = _user_step_schema(

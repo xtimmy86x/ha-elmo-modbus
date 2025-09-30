@@ -1,5 +1,8 @@
 {
    "config":{
+      "error":{
+         "invalid_input":"Enter alarm input numbers within the supported range."
+      },
       "step":{
          "user":{
             "title":"Connect to Elmo alarm",
@@ -17,7 +20,7 @@
                "host":"IP or hostname of the Alarm.",
                "port":"Modbus TCP port, typically 502.",
                "scan_interval":"Time interval in seconds between alarm state scans.",
-               "input_sensors":"Number of alarm inputs to create, starting from input 1."
+               "input_sensors":"Provide comma-separated alarm input numbers or ranges (e.g. 1-4,6)."
             }
          }
       }
@@ -49,7 +52,7 @@
                "host":"IP or hostname of the Alarm.",
                "port":"Modbus TCP port, typically 502.",
                "scan_interval":"Time interval in seconds between alarm state scans.",
-               "input_sensors":"Number of alarm inputs to create, starting from input 1."
+               "input_sensors":"Provide comma-separated alarm input numbers or ranges (e.g. 1-4,6)."
             }
          },
          "panels":{
@@ -87,6 +90,7 @@
       },
       "error":{
          "invalid_sector":"Enter sector numbers within the supported range.",
+         "invalid_input":"Enter alarm input numbers within the supported range.",
          "invalid_slug":"Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
          "duplicate_slug":"Each panel must use a unique entity ID suffix.",
          "invalid_panel":"Select a valid panel to edit.",

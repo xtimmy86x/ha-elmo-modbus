@@ -1,5 +1,8 @@
 {
    "config":{
+      "error":{
+         "invalid_input":"Inserisci numeri di ingressi di allarme nell'intervallo supportato."
+      },
       "step":{
          "user":{
             "title":"Connessione all'allarme Elmo",
@@ -17,7 +20,7 @@
                "host":"Indirizzo IP o hostname dell'allarme.",
                "port":"Porta Modbus TCP, solitamente 502.",
                "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme.",
-               "input_sensors":"Numero di ingressi di allarme da creare, a partire dall'ingresso 1."
+               "input_sensors":"Fornisci numeri o intervalli di ingressi di allarme separati da virgole (es. 1-4,6)."
             }
          }
       }
@@ -49,7 +52,7 @@
                "host":"Indirizzo IP o hostname dell'allarme.",
                "port":"Porta Modbus TCP, solitamente 502.",
                "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme.",
-               "input_sensors":"Numero di ingressi di allarme da creare, a partire dall'ingresso 1."
+               "input_sensors":"Fornisci numeri o intervalli di ingressi di allarme separati da virgole (es. 1-4,6)."
             }
          },
          "panels":{
@@ -87,6 +90,7 @@
       },
       "error":{
          "invalid_sector":"Inserisci numeri di settore nel range supportato.",
+         "invalid_input":"Inserisci numeri di ingressi di allarme nell'intervallo supportato.",
          "invalid_slug":"Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
          "duplicate_slug":"Ogni pannello deve avere un suffisso ID entità univoco.",
          "invalid_panel":"Seleziona un pannello valido da modificare.",
