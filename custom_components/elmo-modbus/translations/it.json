@@ -27,9 +27,29 @@
          "init":{
             "title":"Opzioni Elmo Modbus",
             "menu_options":{
+               "config":"Modifica impostazioni connessione",
                "panels":"Configura pannelli",
                "add_panel":"Aggiungi pannello",
                "user_codes":"Gestisci codici utente"
+            }
+         },
+         "config":{
+            "title":"Impostazioni di connessione",
+            "description":"Aggiorna i dettagli di connessione e il comportamento di polling dell'integrazione.",
+            "data":{
+               "name":"Nome",
+               "host":"Host",
+               "port":"Porta",
+               "scan_interval":"Intervallo di scansione (secondi)",
+               "sectors":"Numero di settori",
+               "input_sensors":"Ingressi di allarme"
+            },
+            "data_description":{
+               "name":"Un nome descrittivo per l'allarme (utilizzato nei nomi delle entità).",
+               "host":"Indirizzo IP o hostname dell'allarme.",
+               "port":"Porta Modbus TCP, solitamente 502.",
+               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme.",
+               "input_sensors":"Numero di ingressi di allarme da creare, a partire dall'ingresso 1."
             }
          },
          "panels":{
@@ -73,7 +93,8 @@
          "no_panels":"Aggiungi un pannello prima di modificarne la configurazione.",
          "required":"Questo campo è obbligatorio.",
          "duplicate_code":"Ogni codice deve essere univoco.",
-         "invalid_code":"Inserisci almeno un codice valido oppure lascia il campo vuoto."
+         "invalid_code":"Inserisci almeno un codice valido oppure lascia il campo vuoto.",
+         "already_configured":"Esiste già una configurazione per questo host e questa porta."
       }
    },
    "entity":{

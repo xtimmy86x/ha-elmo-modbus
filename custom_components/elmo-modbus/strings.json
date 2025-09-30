@@ -27,9 +27,29 @@
          "init":{
             "title":"Elmo Modbus options",
             "menu_options":{
+               "config":"Edit connection settings",
                "panels":"Configure panels",
                "add_panel":"Add panel",
                "user_codes":"Manage user codes"
+            }
+         },
+         "config":{
+            "title":"Connection settings",
+            "description":"Update the connection details and polling behaviour for the integration.",
+            "data":{
+               "name":"Name",
+               "host":"Host",
+               "port":"Port",
+               "scan_interval":"Scan interval (seconds)",
+               "sectors":"Number of sectors",
+               "input_sensors":"Alarm inputs"
+            },
+            "data_description":{
+               "name":"A friendly name for the Alarm (used in entity names).",
+               "host":"IP or hostname of the Alarm.",
+               "port":"Modbus TCP port, typically 502.",
+               "scan_interval":"Time interval in seconds between alarm state scans.",
+               "input_sensors":"Number of alarm inputs to create, starting from input 1."
             }
          },
          "panels":{
@@ -73,7 +93,8 @@
          "no_panels":"Add a panel before editing its configuration.",
          "required":"This field is required.",
          "duplicate_code":"Each code must be unique.",
-         "invalid_code":"Enter at least one valid code or leave the field blank."
+         "invalid_code":"Enter at least one valid code or leave the field blank.",
+         "already_configured":"A configuration already exists for this host and port."
       }
    },
    "entity":{

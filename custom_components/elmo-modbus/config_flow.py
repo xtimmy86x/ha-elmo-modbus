@@ -65,6 +65,7 @@ def _user_step_schema(
 
 DATA_SCHEMA = _user_step_schema()
 
+MENU_OPTION_CONFIG = "config"
 MENU_OPTION_PANELS = "panels"
 MENU_OPTION_ADD_PANEL = "add_panel"
 MENU_OPTION_USER_CODES = "user_codes"
@@ -241,10 +242,114 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options={
+                MENU_OPTION_CONFIG,
                 MENU_OPTION_PANELS,
                 MENU_OPTION_ADD_PANEL,
                 MENU_OPTION_USER_CODES,
             },
+        )
+
+    async def async_step_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Edit the core configuration values for the integration."""
+
+        current_data = self._config_entry.data
+        default_name = current_data.get("name", DEFAULT_NAME)
+        default_host = current_data.get("host", "")
+        default_port = current_data.get("port", DEFAULT_PORT)
+        default_scan = current_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        default_sectors = current_data.get(CONF_SECTORS, self._sector_limit)
+        default_inputs = current_data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            raw_name = (user_input.get("name") or "").strip()
+            raw_host = (user_input.get("host") or "").strip()
+            port = user_input.get("port", DEFAULT_PORT)
+            scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
+            sectors = user_input.get("sectors", default_sectors)
+            input_sensors = user_input.get(CONF_INPUT_SENSORS, default_inputs)
+
+            if not raw_host:
+                errors["host"] = "required"
+
+            name = raw_name or DEFAULT_NAME
+
+            unique_id = f"{raw_host}:{port}"
+            if not errors and unique_id != self._config_entry.unique_id:
+                for entry in self.hass.config_entries.async_entries(DOMAIN):
+                    if (
+                        entry.unique_id == unique_id
+                        and entry.entry_id != self._config_entry.entry_id
+                    ):
+                        errors["base"] = "already_configured"
+                        break
+
+            if not errors:
+                new_data = {
+                    "name": name,
+                    "host": raw_host,
+                    "port": port,
+                    CONF_SCAN_INTERVAL: scan_interval,
+                    CONF_SECTORS: sectors,
+                    CONF_INPUT_SENSORS: input_sensors,
+                }
+
+                self.hass.config_entries.async_update_entry(
+                    self._config_entry,
+                    data=new_data,
+                    title=name,
+                    unique_id=unique_id,
+                )
+
+                sector_limit = max(1, min(sectors, REGISTER_STATUS_COUNT))
+                if sector_limit != self._sector_limit:
+                    for panel in self._panels:
+                        sanitized_modes: dict[str, list[int]] = {}
+                        for mode, values in panel.get("modes", {}).items():
+                            valid = sorted(
+                                {
+                                    sector
+                                    for sector in values
+                                    if isinstance(sector, int)
+                                    and 1 <= sector <= sector_limit
+                                }
+                            )
+                            if valid:
+                                sanitized_modes[mode] = valid
+                        panel["modes"] = sanitized_modes
+
+                    self._sector_limit = sector_limit
+                    self._update_config_entry_options()
+                else:
+                    self._sector_limit = sector_limit
+
+                return await self.async_step_init()
+
+            schema = _user_step_schema(
+                name=raw_name,
+                host=raw_host,
+                port=port,
+                scan_interval=scan_interval,
+                sectors=sectors,
+                input_sensors=input_sensors,
+            )
+        else:
+            schema = _user_step_schema(
+                name=default_name,
+                host=default_host,
+                port=default_port,
+                scan_interval=default_scan,
+                sectors=default_sectors,
+                input_sensors=default_inputs,
+            )
+
+        return self.async_show_form(
+            step_id="config",
+            data_schema=schema,
+            errors=errors,
         )
 
     async def async_step_add_panel(
