@@ -1,7 +1,7 @@
 """Constants for the Elmo Modbus integration."""
 
 DOMAIN = "elmo_modbus"
-PLATFORMS = ["alarm_control_panel", "binary_sensor"]
+PLATFORMS = ["alarm_control_panel", "binary_sensor", "sensor"]
 DEFAULT_SCAN_INTERVAL = 1  # in seconds
 DEFAULT_NAME = "Elmo Modbus"
 DEFAULT_SECTORS = 64

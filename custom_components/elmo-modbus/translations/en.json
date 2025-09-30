@@ -157,5 +157,10 @@
             "state_off":"No"
          }
       }
+      },
+      "sensor":{
+         "central_temperature":{
+            "name":"Control panel temperature"
+         }
    }
 }

@@ -144,3 +144,72 @@ class ElmoModbusBinarySensorCoordinator(DataUpdateCoordinator[dict[int, bool]]):
             raise UpdateFailed(f"Modbus connection failed: {err}") from err
         except Exception as err:  # pragma: no cover
             raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
+
+class ElmoModbusSensorCoordinator(DataUpdateCoordinator[dict[int, int | None]]):
+    """Coordinator for reading holding registers exposed as sensors."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: ModbusTcpClient,
+        *,
+        addresses: Iterable[int],
+        scan_interval: int = DEFAULT_SCAN_INTERVAL,
+    ) -> None:
+        """Initialise the sensor coordinator."""
+
+        super().__init__(
+            hass,
+            LOGGER,
+            name="Elmo Modbus sensors",
+            update_interval=timedelta(seconds=max(1, scan_interval)),
+        )
+        self._client = client
+        ordered = sorted({int(address) for address in addresses})
+        groups: list[list[int]] = []
+        current: list[int] = []
+        for address in ordered:
+            if not current or address == current[-1] + 1:
+                current.append(address)
+                continue
+            groups.append(current)
+            current = [address]
+        if current:
+            groups.append(current)
+
+        self._groups: list[tuple[int, int, tuple[int, ...]]] = [
+            (group[0], len(group), tuple(group)) for group in groups
+        ]
+
+    async def _async_update_data(self) -> dict[int, int | None]:
+        """Poll the Modbus device for holding registers."""
+
+        def _read_group(start: int, count: int) -> list[int]:
+            if not self._client.connected:
+                if not self._client.connect():
+                    raise ConnectionException("Unable to connect to Modbus device")
+
+            response = self._client.read_holding_registers(start, count=count)
+            if not response or getattr(response, "isError", lambda: True)():
+                raise ConnectionException("Invalid response when reading register")
+
+            registers: list[int] = list(getattr(response, "registers", []) or [])
+            return registers[:count]
+
+        results: dict[int, int | None] = {}
+
+        try:
+            for start, count, addresses in self._groups:
+                registers = await self.hass.async_add_executor_job(
+                    _read_group, start, count
+                )
+                for index, address in enumerate(addresses):
+                    results[address] = (
+                        registers[index] if index < len(registers) else None
+                    )
+            return results
+        except ConnectionException as err:
+            raise UpdateFailed(f"Modbus connection failed: {err}") from err
+        except Exception as err:  # pragma: no cover
+            raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
+        
