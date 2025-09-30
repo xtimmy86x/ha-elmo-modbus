@@ -102,6 +102,7 @@ class ElmoModbusBinarySensorCoordinator(DataUpdateCoordinator[dict[int, bool]]):
         )
         self._client = client
         ordered = sorted({int(address) for address in addresses})
+        self._addresses: tuple[int, ...] = tuple(ordered)
         groups: list[list[int]] = []
         current: list[int] = []
         for address in ordered:
@@ -144,6 +145,13 @@ class ElmoModbusBinarySensorCoordinator(DataUpdateCoordinator[dict[int, bool]]):
             raise UpdateFailed(f"Modbus connection failed: {err}") from err
         except Exception as err:  # pragma: no cover
             raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
+
+    @property
+    def addresses(self) -> tuple[int, ...]:
+        """Return the discrete input addresses polled by the coordinator."""
+
+        return self._addresses
+
 
 class ElmoModbusSensorCoordinator(DataUpdateCoordinator[dict[int, int | None]]):
     """Coordinator for reading holding registers exposed as sensors."""
@@ -212,4 +220,3 @@ class ElmoModbusSensorCoordinator(DataUpdateCoordinator[dict[int, int | None]]):
             raise UpdateFailed(f"Modbus connection failed: {err}") from err
         except Exception as err:  # pragma: no cover
             raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
-        

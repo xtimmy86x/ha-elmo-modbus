@@ -9,13 +9,15 @@
                "host":"Host",
                "port":"Port",
                "scan_interval":"Scan interval (seconds)",
-               "sectors":"Number of sectors"
+               "sectors":"Number of sectors",
+               "input_sensors":"Alarm inputs"
             },
             "data_description":{
                "name":"A friendly name for the Alarm (used in entity names).",
                "host":"IP or hostname of the Alarm.",
                "port":"Modbus TCP port, typically 502.",
-               "scan_interval":"Time interval in seconds between alarm state scans."
+               "scan_interval":"Time interval in seconds between alarm state scans.",
+               "input_sensors":"Number of alarm inputs to create, starting from input 1."
             }
          }
       }
@@ -125,6 +127,11 @@
             "name":"General control panel tamper",
             "state_on":"Tamper",
             "state_off":"Clear"
+         },
+         "input_alarm":{
+            "name":"Alarm input {index}",
+            "state_on":"Alarm",
+            "state_off":"Normal"
          },
          "sectors_not_armable":{
             "name":"Sectors not armable",

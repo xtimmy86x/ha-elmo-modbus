@@ -9,13 +9,15 @@
                "host":"Host",
                "port":"Porta",
                "scan_interval":"Intervallo di scansione (secondi)",
-               "sectors":"Numero di settori"
+               "sectors":"Numero di settori",
+               "input_sensors":"Ingressi di allarme"
             },
             "data_description":{
                "name":"Un nome descrittivo per l'allarme (utilizzato nei nomi delle entità).",
                "host":"Indirizzo IP o hostname dell'allarme.",
                "port":"Porta Modbus TCP, solitamente 502.",
-               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme."
+               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme.",
+               "input_sensors":"Numero di ingressi di allarme da creare, a partire dall'ingresso 1."
             }
          }
       }
@@ -125,6 +127,11 @@
             "name":"Manomissione generale centrale",
             "state_on":"Manomissione",
             "state_off":"Assente"
+         },
+         "input_alarm":{
+            "name":"Ingresso allarme {index}",
+            "state_on":"Allarme",
+            "state_off":"Riposo"
          },
          "sectors_not_armable":{
             "name":"Settori non inseribili",

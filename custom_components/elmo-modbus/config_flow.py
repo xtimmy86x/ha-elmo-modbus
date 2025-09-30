@@ -13,12 +13,15 @@ from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
+    CONF_INPUT_SENSORS,
     CONF_SCAN_INTERVAL,
     CONF_SECTORS,
+    DEFAULT_INPUT_SENSORS,
     DEFAULT_NAME,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SECTORS,
     DOMAIN,
+    INPUT_SENSOR_COUNT,
     OPTION_USER_CODES,
     REGISTER_STATUS_COUNT,
 )
@@ -30,7 +33,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _user_step_schema(
-    name: str = DEFAULT_NAME, host: str = "", port: int = DEFAULT_PORT
+    name: str = DEFAULT_NAME,
+    host: str = "",
+    port: int = DEFAULT_PORT,
+    *,
+    scan_interval: int = DEFAULT_SCAN_INTERVAL,
+    sectors: int = DEFAULT_SECTORS,
+    input_sensors: int = DEFAULT_INPUT_SENSORS,
 ) -> vol.Schema:
     """Return the schema for the initial configuration step."""
 
@@ -41,11 +50,14 @@ def _user_step_schema(
             vol.Required("port", default=port): vol.All(
                 int, vol.Range(min=1, max=65535)
             ),
-            vol.Required("scan_interval", default=DEFAULT_SCAN_INTERVAL): vol.All(
+            vol.Required("scan_interval", default=scan_interval): vol.All(
                 int, vol.Range(min=1, max=3600)
             ),
-            vol.Required("sectors", default=DEFAULT_SECTORS): vol.All(
+            vol.Required("sectors", default=sectors): vol.All(
                 int, vol.Range(min=1, max=DEFAULT_SECTORS)
+            ),
+            vol.Required(CONF_INPUT_SENSORS, default=input_sensors): vol.All(
+                int, vol.Range(min=1, max=INPUT_SENSOR_COUNT)
             ),
         }
     )
@@ -138,6 +150,7 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             port = user_input.get("port", DEFAULT_PORT)
             scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
             sectors = user_input.get("sectors", DEFAULT_SECTORS)
+            input_sensors = user_input.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
 
             if not raw_host:
                 errors["host"] = "required"
@@ -151,6 +164,7 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     port=port,
                     scan_interval=scan_interval,
                     sectors=sectors,
+                    input_sensors=input_sensors,
                 )
                 return self.async_show_form(
                     step_id="user",
@@ -167,6 +181,7 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "port": port,
                 CONF_SCAN_INTERVAL: scan_interval,
                 CONF_SECTORS: sectors,
+                CONF_INPUT_SENSORS: input_sensors,
             }
             _LOGGER.debug("Creating config entry with data: %s", data)
             return self.async_create_entry(title=name, data=data)

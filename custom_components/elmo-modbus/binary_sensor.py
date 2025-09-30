@@ -17,9 +17,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_INPUT_SENSORS,
     CONF_SCAN_INTERVAL,
+    DEFAULT_INPUT_SENSORS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    INPUT_SENSOR_COUNT,
+    INPUT_SENSOR_START,
 )
 from .coordinator import ElmoModbusBinarySensorCoordinator
 
@@ -31,7 +35,7 @@ class ElmoBinarySensorDescription(BinarySensorEntityDescription):
     address: int
 
 
-SENSOR_DESCRIPTIONS: tuple[ElmoBinarySensorDescription, ...] = (
+BASE_SENSOR_DESCRIPTIONS: tuple[ElmoBinarySensorDescription, ...] = (
     ElmoBinarySensorDescription(
         key="central_power_fault",
         translation_key="central_power_fault",
@@ -153,13 +157,29 @@ async def async_setup_entry(
         "binary_coordinator"
     )
 
-    if coordinator is None:
+    input_sensor_count = entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
+    input_sensor_total = max(1, min(int(input_sensor_count), INPUT_SENSOR_COUNT))
+    input_descriptions = [
+        ElmoBinarySensorDescription(
+            key=f"alarm_input_{index}",
+            translation_key="input_alarm",
+            translation_placeholders={"index": str(index)},
+            address=INPUT_SENSOR_START + index - 1,
+            device_class=BinarySensorDeviceClass.SAFETY,
+        )
+        for index in range(1, input_sensor_total + 1)
+    ]
+
+    descriptions = [*BASE_SENSOR_DESCRIPTIONS, *input_descriptions]
+    addresses = tuple(description.address for description in descriptions)
+
+    if coordinator is None or set(coordinator.addresses) != set(addresses):
         client = data["client"]
         scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         coordinator = ElmoModbusBinarySensorCoordinator(
             hass,
             client,
-            addresses=[description.address for description in SENSOR_DESCRIPTIONS],
+            addresses=addresses,
             scan_interval=scan_interval,
         )
         await coordinator.async_config_entry_first_refresh()
@@ -167,7 +187,7 @@ async def async_setup_entry(
 
     entities = [
         ElmoModbusBinarySensor(entry, coordinator, description)
-        for description in SENSOR_DESCRIPTIONS
+        for description in descriptions
     ]
 
     if entities:
