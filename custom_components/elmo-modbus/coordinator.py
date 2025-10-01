@@ -153,6 +153,78 @@ class ElmoModbusBinarySensorCoordinator(DataUpdateCoordinator[dict[int, bool]]):
         return self._addresses
 
 
+class ElmoModbusSwitchCoordinator(DataUpdateCoordinator[dict[int, bool]]):
+    """Coordinator for reading and tracking output coil states."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        client: ModbusTcpClient,
+        *,
+        addresses: Iterable[int],
+        scan_interval: int = DEFAULT_SCAN_INTERVAL,
+    ) -> None:
+        """Initialise the output coordinator."""
+
+        super().__init__(
+            hass,
+            LOGGER,
+            name="Elmo Modbus outputs",
+            update_interval=timedelta(seconds=max(1, scan_interval)),
+        )
+        self._client = client
+        ordered = sorted({int(address) for address in addresses})
+        self._addresses: tuple[int, ...] = tuple(ordered)
+        groups: list[list[int]] = []
+        current: list[int] = []
+        for address in ordered:
+            if not current or address == current[-1] + 1:
+                current.append(address)
+                continue
+            groups.append(current)
+            current = [address]
+        if current:
+            groups.append(current)
+
+        self._groups: list[tuple[int, int, tuple[int, ...]]] = [
+            (group[0], len(group), tuple(group)) for group in groups
+        ]
+
+    async def _async_update_data(self) -> dict[int, bool]:
+        """Poll the Modbus device for output coil states."""
+
+        def _read_group(start: int, count: int) -> list[bool]:
+            if not self._client.connected:
+                if not self._client.connect():
+                    raise ConnectionException("Unable to connect to Modbus device")
+
+            response = self._client.read_coils(start, count=count)
+            if not response or getattr(response, "isError", lambda: True)():
+                raise ConnectionException("Invalid response when reading register")
+
+            bits: list[bool] = list(response.bits)
+            return bits[:count]
+
+        results: dict[int, bool] = {}
+
+        try:
+            for start, count, addresses in self._groups:
+                bits = await self.hass.async_add_executor_job(_read_group, start, count)
+                for index, address in enumerate(addresses):
+                    results[address] = bool(bits[index]) if index < len(bits) else False
+            return results
+        except ConnectionException as err:
+            raise UpdateFailed(f"Modbus connection failed: {err}") from err
+        except Exception as err:  # pragma: no cover
+            raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
+
+    @property
+    def addresses(self) -> tuple[int, ...]:
+        """Return the coil addresses polled by the coordinator."""
+
+        return self._addresses
+
+
 class ElmoModbusSensorCoordinator(DataUpdateCoordinator[dict[int, int | None]]):
     """Coordinator for reading holding registers exposed as sensors."""
 

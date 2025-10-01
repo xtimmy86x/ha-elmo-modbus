@@ -30,6 +30,7 @@
             "menu_options":{
                "config":"Edit connection settings",
                "inputs":"Configure alarm inputs",
+               "outputs":"Configure outputs",
                "panels":"Configure panels",
                "add_panel":"Add panel",
                "user_codes":"Manage user codes"
@@ -72,6 +73,26 @@
                "pre_title":"Name of input"
             }
          },
+         "outputs":{
+            "title":"Outputs",
+            "description":"Choose how many outputs to expose and specify their identifiers. Outputs must be between 1 and {max_output}.",
+            "data":{
+               "count":"Number of outputs",
+               "output_switches":"Outputs to expose"
+            },
+            "data_description":{
+               "count":"Total number of outputs to configure.",
+               "output_switches":"Provide comma-separated output numbers or ranges (e.g. 1-4,6)."
+            }
+         },
+         "output_names":{
+            "title":"Name outputs",
+            "description":"Assign a descriptive name to each of the {count} selected outputs.",
+            "data":{
+               "default_output_name":"Output {number}",
+               "pre_title":"Name of output"
+            }
+         },
          "panels":{
             "title":"Select panel",
             "description":"Choose the panel to edit. Use the options menu to add a new panel if needed.",
@@ -108,7 +129,9 @@
       "error":{
          "invalid_sector":"Enter sector numbers within the supported range.",
          "invalid_input":"Enter alarm input numbers within the supported range.",
+         "invalid_output":"Enter output numbers within the supported range.",
          "input_count_mismatch":"The number of inputs must match the identifiers you selected.",
+         "output_count_mismatch":"The number of outputs must match the identifiers you selected.",
          "invalid_slug":"Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
          "duplicate_slug":"Each panel must use a unique entity ID suffix.",
          "invalid_panel":"Select a valid panel to edit.",
@@ -205,6 +228,13 @@
             "name":"Excluded zones",
             "state_on":"Yes",
             "state_off":"No"
+         }
+      },
+      "switch":{
+         "output_switch":{
+            "name":"Output {index}",
+            "state_on":"On",
+            "state_off":"Off"
          }
       },
       "sensor":{

@@ -15,16 +15,20 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_INPUT_SENSORS,
+    CONF_OUTPUT_SWITCHES,
     CONF_SCAN_INTERVAL,
     CONF_SECTORS,
     DEFAULT_INPUT_SENSORS,
     DEFAULT_NAME,
+    DEFAULT_OUTPUT_SWITCHES,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SECTORS,
     DOMAIN,
     INPUT_SENSOR_COUNT,
     OPTION_INPUT_NAMES,
+    OPTION_OUTPUT_NAMES,
     OPTION_USER_CODES,
+    OUTPUT_SWITCH_COUNT,
     REGISTER_STATUS_COUNT,
 )
 from .input_selectors import (
@@ -70,6 +74,31 @@ async def _async_input_name_templates(
     return str(default_template), str(title_template)
 
 
+async def _async_output_name_templates(
+    hass: HomeAssistant,
+) -> tuple[str, str]:
+    """Return templates for default output names and titles."""
+
+    try:
+        translations = await async_get_translations(
+            hass,
+            language=hass.config.language,
+            category="options",
+            integrations={DOMAIN},
+            config_flow=True,
+        )
+    except Exception:  # pragma: no cover - defensive, HA handles logging
+        _LOGGER.debug("Falling back to default output name templates", exc_info=True)
+        return "Output {number}", "Name of output"
+
+    base_key = f"component.{DOMAIN}.options.step.output_names.data.{{}}"
+    default_template = translations.get(
+        base_key.format("default_output_name"), "Output {number}"
+    )
+    title_template = translations.get(base_key.format("pre_title"), "Name of output")
+    return str(default_template), str(title_template)
+
+
 def _format_with_number(template: str, number: int) -> str:
     """Format a translation template, ignoring missing placeholders."""
 
@@ -110,6 +139,7 @@ DATA_SCHEMA = _user_step_schema()
 
 MENU_OPTION_CONFIG = "config"
 MENU_OPTION_INPUTS = "inputs"
+MENU_OPTION_OUTPUTS = "outputs"
 MENU_OPTION_PANELS = "panels"
 MENU_OPTION_ADD_PANEL = "add_panel"
 MENU_OPTION_USER_CODES = "user_codes"
@@ -232,12 +262,20 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default_input_names = {
                 str(sensor): f"Alarm input {sensor}" for sensor in default_inputs
             }
+            default_outputs = normalize_input_sensor_config(
+                DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
+            )
+            default_output_names = {
+                str(output): f"Output {output}" for output in default_outputs
+            }
             return self.async_create_entry(
                 title=name,
                 data=data,
                 options={
                     CONF_INPUT_SENSORS: default_inputs,
                     OPTION_INPUT_NAMES: default_input_names,
+                    CONF_OUTPUT_SWITCHES: default_outputs,
+                    OPTION_OUTPUT_NAMES: default_output_names,
                 },
             )
 
@@ -319,6 +357,38 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         # input naming step runs instead.
         self._input_name_language: str | None = None
 
+        self._output_switch_ids: list[int] = normalize_input_sensor_config(
+            config_entry.options.get(CONF_OUTPUT_SWITCHES),
+            max_input=OUTPUT_SWITCH_COUNT,
+        )
+        if not self._output_switch_ids:
+            self._output_switch_ids = normalize_input_sensor_config(
+                config_entry.data.get(CONF_OUTPUT_SWITCHES, DEFAULT_OUTPUT_SWITCHES),
+                max_input=OUTPUT_SWITCH_COUNT,
+            )
+        if not self._output_switch_ids:
+            self._output_switch_ids = normalize_input_sensor_config(
+                DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
+            )
+
+        raw_output_names = config_entry.options.get(OPTION_OUTPUT_NAMES, {})
+        self._output_names: dict[str, str] = {}
+        if isinstance(raw_output_names, dict):
+            for key, value in raw_output_names.items():
+                try:
+                    output = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if output not in self._output_switch_ids:
+                    continue
+                name = str(value).strip()
+                if name:
+                    self._output_names[str(output)] = name
+
+        self._pending_output_switch_ids: list[int] | None = None
+        self._output_name_templates: tuple[str, str] | None = None
+        self._output_name_language: str | None = None
+
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
     ) -> FlowResult:
@@ -329,6 +399,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             menu_options={
                 MENU_OPTION_CONFIG,
                 MENU_OPTION_INPUTS,
+                MENU_OPTION_OUTPUTS,
                 MENU_OPTION_PANELS,
                 MENU_OPTION_ADD_PANEL,
                 MENU_OPTION_USER_CODES,
@@ -587,6 +658,162 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             description_placeholders={"count": str(len(sensor_ids))},
         )
 
+    async def async_step_outputs(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure which outputs should be exposed as switches."""
+
+        if self._output_switch_ids:
+            default_outputs = list(self._output_switch_ids)
+        elif CONF_OUTPUT_SWITCHES in self._config_entry.options:
+            default_outputs = []
+        else:
+            default_outputs = normalize_input_sensor_config(
+                DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
+            )
+
+        default_count = len(default_outputs)
+        default_value = format_input_sensor_list(default_outputs)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            count = user_input.get("count", default_count)
+            raw_selection = user_input.get(CONF_OUTPUT_SWITCHES, "")
+
+            if count == 0:
+                if raw_selection and raw_selection.strip():
+                    errors[CONF_OUTPUT_SWITCHES] = "invalid_output"
+                else:
+                    self._output_switch_ids = []
+                    self._output_names = {}
+                    self._pending_output_switch_ids = None
+                    self._update_config_entry_options()
+                    return await self.async_step_init()
+            else:
+                try:
+                    outputs = parse_input_sensor_selection(
+                        raw_selection, max_input=OUTPUT_SWITCH_COUNT
+                    )
+                except ValueError:
+                    errors[CONF_OUTPUT_SWITCHES] = "invalid_output"
+                    outputs = default_outputs
+                else:
+                    if len(outputs) != count:
+                        errors["count"] = "output_count_mismatch"
+
+                if not errors:
+                    self._pending_output_switch_ids = outputs
+                    self._retain_output_names(outputs)
+                    return await self.async_step_output_names()
+
+            schema = vol.Schema(
+                {
+                    vol.Required("count", default=count): vol.All(
+                        int, vol.Range(min=0, max=OUTPUT_SWITCH_COUNT)
+                    ),
+                    vol.Optional(
+                        CONF_OUTPUT_SWITCHES,
+                        default=raw_selection,
+                    ): str,
+                }
+            )
+        else:
+            schema = vol.Schema(
+                {
+                    vol.Required("count", default=default_count): vol.All(
+                        int, vol.Range(min=0, max=OUTPUT_SWITCH_COUNT)
+                    ),
+                    vol.Optional(CONF_OUTPUT_SWITCHES, default=default_value): str,
+                }
+            )
+
+        return self.async_show_form(
+            step_id="outputs",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"max_output": str(OUTPUT_SWITCH_COUNT)},
+        )
+
+    async def async_step_output_names(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Assign names to each configured output switch."""
+
+        switch_ids = self._pending_output_switch_ids or self._output_switch_ids
+        if not switch_ids:
+            self._output_switch_ids = []
+            self._output_names = {}
+            self._pending_output_switch_ids = None
+            self._update_config_entry_options()
+            return await self.async_step_init()
+
+        hass = self.hass
+        language = getattr(getattr(hass, "config", None), "language", None)
+        if self._output_name_language != language:
+            self._output_name_templates = None
+            self._output_name_language = language
+
+        if self._output_name_templates is None:
+            if hass is None:
+                self._output_name_templates = (
+                    "Output {number}",
+                    "Name of output",
+                )
+            else:
+                self._output_name_templates = await _async_output_name_templates(hass)
+
+        default_template, title_template = self._output_name_templates
+
+        errors: dict[str, str] = {}
+        collected: dict[str, str] = {}
+        field_labels: dict[int, str] = {}
+        defaults: dict[int, str] = {}
+
+        for switch in switch_ids:
+            label = _format_with_number(title_template, switch)
+            if label == title_template:
+                label = f"{label} {switch}"
+            field_labels[switch] = label
+            stored_name = self._output_names.get(str(switch))
+            if stored_name:
+                defaults[switch] = stored_name
+                continue
+            fallback = _format_with_number(default_template, switch)
+            if fallback == default_template:
+                fallback = f"Output {switch}"
+            defaults[switch] = fallback
+
+        if user_input is not None:
+            for switch in switch_ids:
+                field = field_labels[switch]
+                raw_value = (user_input.get(field) or "").strip()
+                if not raw_value:
+                    errors[field] = "required"
+                else:
+                    collected[str(switch)] = raw_value
+
+            if not errors:
+                self._output_switch_ids = switch_ids
+                self._output_names = collected
+                self._pending_output_switch_ids = None
+                self._update_config_entry_options()
+                return await self.async_step_init()
+
+        schema_dict: dict[Any, Any] = {}
+        for switch in switch_ids:
+            field = field_labels[switch]
+            schema_dict[vol.Required(field, default=defaults[switch])] = str
+
+        schema = vol.Schema(schema_dict)
+
+        return self.async_show_form(
+            step_id="output_names",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"count": str(len(switch_ids))},
+        )
+
     async def async_step_add_panel(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -638,6 +865,10 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         options[OPTION_INPUT_NAMES] = {
             key: value for key, value in self._input_names.items() if key and value
         }
+        options[CONF_OUTPUT_SWITCHES] = list(self._output_switch_ids)
+        options[OPTION_OUTPUT_NAMES] = {
+            key: value for key, value in self._output_names.items() if key and value
+        }
         self.hass.config_entries.async_update_entry(
             self._config_entry,
             options=options,
@@ -652,6 +883,16 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             if key in self._input_names:
                 existing[key] = self._input_names[key]
         self._input_names = existing
+
+    def _retain_output_names(self, switch_ids: list[int]) -> None:
+        """Preserve configured names for the provided output identifiers."""
+
+        existing: dict[str, str] = {}
+        for switch in switch_ids:
+            key = str(switch)
+            if key in self._output_names:
+                existing[key] = self._output_names[key]
+        self._output_names = existing
 
     async def async_step_panels(
         self, user_input: dict[str, Any] | None = None

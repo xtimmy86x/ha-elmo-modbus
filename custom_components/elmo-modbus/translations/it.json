@@ -30,6 +30,7 @@
             "menu_options":{
                "config":"Modifica impostazioni connessione",
                "inputs":"Configura ingressi di allarme",
+               "outputs":"Configura uscite",
                "panels":"Configura pannelli",
                "add_panel":"Aggiungi pannello",
                "user_codes":"Gestisci codici utente"
@@ -71,7 +72,27 @@
                "default_input_name": "Ingresso allarme {number}",
                "pre_title":"Nome dell'ingresso"
             }
-         },         
+         },
+         "outputs":{
+            "title":"Uscite",
+            "description":"Scegli quante uscite esporre e specifica i loro identificativi. Le uscite devono essere comprese tra 1 e {max_output}.",
+            "data":{
+               "count":"Numero di uscite",
+               "output_switches":"Uscite da esporre"
+            },
+            "data_description":{
+               "count":"Numero totale di uscite da configurare.",
+               "output_switches":"Fornisci numeri o intervalli di uscite separati da virgole (es. 1-4,6)."
+            }
+         },
+         "output_names":{
+            "title":"Assegna nomi alle uscite",
+            "description":"Assegna un nome descrittivo a ciascuna delle {count} uscite selezionate.",
+            "data":{
+               "default_output_name":"Uscita {number}",
+               "pre_title":"Nome dell'uscita"
+            }
+         },        
          "panels":{
             "title":"Seleziona pannello",
             "description":"Scegli il pannello da modificare. Usa il menu opzioni per aggiungere un nuovo pannello se necessario.",
@@ -108,7 +129,9 @@
       "error":{
          "invalid_sector":"Inserisci numeri di settore nel range supportato.",
          "invalid_input":"Inserisci numeri di ingressi di allarme nell'intervallo supportato.",
+         "invalid_output":"Inserisci numeri di uscite nell'intervallo supportato.",
          "input_count_mismatch":"Il numero di ingressi deve corrispondere agli identificativi selezionati.",
+         "output_count_mismatch":"Il numero di uscite deve corrispondere agli identificativi selezionati.",
          "invalid_slug":"Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
          "duplicate_slug":"Ogni pannello deve avere un suffisso ID entità univoco.",
          "invalid_panel":"Seleziona un pannello valido da modificare.",
@@ -205,6 +228,13 @@
             "name":"Ingressi esclusi",
             "state_on":"Sì",
             "state_off":"No"
+         }
+      },
+      "switch":{
+         "output_switch":{
+            "name":"Uscita {index}",
+            "state_on":"Attivo",
+            "state_off":"Disattivo"
          }
       },
       "sensor":{
