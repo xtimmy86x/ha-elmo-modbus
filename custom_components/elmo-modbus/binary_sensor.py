@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -12,9 +13,11 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .const import (
     CONF_INPUT_SENSORS,
@@ -35,6 +38,7 @@ class ElmoBinarySensorDescription(BinarySensorEntityDescription):
     """Description of an Elmo Modbus binary sensor."""
 
     address: int
+    object_id: str | None = None
 
 
 BASE_SENSOR_DESCRIPTIONS: tuple[ElmoBinarySensorDescription, ...] = (
@@ -189,20 +193,61 @@ async def async_setup_entry(
             if name:
                 input_names[sensor] = name
 
-    input_descriptions = [
-        ElmoBinarySensorDescription(
-            key=f"alarm_input_{index}",
-            translation_key="input_alarm",
-            translation_placeholders={"index": str(index)},
-            address=INPUT_SENSOR_START + index - 1,
-            device_class=BinarySensorDeviceClass.SAFETY,
-            name=input_names.get(index),
-        )
-        for index in input_sensor_ids
-    ]
+    input_descriptions: list[ElmoBinarySensorDescription] = []
+    used_object_ids: set[str] = set()
+    for index in sorted(input_sensor_ids):
+        custom_name = input_names.get(index)
+        description_kwargs: dict[str, Any] = {
+            "key": f"alarm_input_{index}",
+            "address": INPUT_SENSOR_START + index - 1,
+            "device_class": BinarySensorDeviceClass.SAFETY,
+        }
+
+        if custom_name:
+            description_kwargs["name"] = custom_name
+        else:
+            description_kwargs["translation_key"] = "input_alarm"
+            description_kwargs["translation_placeholders"] = {"index": str(index)}
+
+        if custom_name:
+            object_id = slugify(custom_name)
+            if not object_id:
+                object_id = f"alarm_input_{index}"
+        else:
+            object_id = f"alarm_input_{index}"
+
+        if object_id in used_object_ids:
+            object_id = f"{object_id}_{index}"
+        used_object_ids.add(object_id)
+
+        description_kwargs["object_id"] = object_id
+
+        input_descriptions.append(ElmoBinarySensorDescription(**description_kwargs))
 
     descriptions = [*BASE_SENSOR_DESCRIPTIONS, *input_descriptions]
     addresses = tuple(description.address for description in descriptions)
+
+    entity_registry = er.async_get(hass)
+    for description in input_descriptions:
+        if not description.object_id:
+            continue
+
+        unique_id = f"{entry.entry_id}:binary:{description.key}"
+        entity_id = entity_registry.async_get_entity_id(
+            "binary_sensor", DOMAIN, unique_id
+        )
+        if entity_id is None:
+            continue
+
+        desired_entity_id = f"binary_sensor.{description.object_id}"
+        if entity_id == desired_entity_id:
+            continue
+
+        existing_entry = entity_registry.entities.get(desired_entity_id)
+        if existing_entry is not None and existing_entry.unique_id != unique_id:
+            continue
+
+        entity_registry.async_update_entity(entity_id, new_entity_id=desired_entity_id)
 
     if coordinator is None or set(coordinator.addresses) != set(addresses):
         client = data["client"]
@@ -242,6 +287,8 @@ class ElmoModbusBinarySensor(
         self.entity_description = description
         self._config_entry = entry
         self._attr_unique_id = f"{entry.entry_id}:binary:{description.key}"
+        if description.object_id:
+            self._attr_suggested_object_id = description.object_id
 
     @property
     def is_on(self) -> bool | None:

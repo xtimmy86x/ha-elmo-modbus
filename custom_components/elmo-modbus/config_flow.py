@@ -529,7 +529,10 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         if self._input_name_templates is None:
             if hass is None:
-                self._input_name_templates = ("Alarm input {number}", "Name of alarm input")
+                self._input_name_templates = (
+                    "Alarm input {number}",
+                    "Name of alarm input",
+                )
             else:
                 self._input_name_templates = await _async_input_name_templates(hass)
 
