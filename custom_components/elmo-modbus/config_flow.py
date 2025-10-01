@@ -7,7 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
 from homeassistant.helpers.translation import async_get_translations
@@ -39,22 +39,44 @@ DEFAULT_PORT = 502
 _LOGGER = logging.getLogger(__name__)
 
 
-async def _translated_default(hass, string, number: int) -> str:
-    # Recupera le traduzioni per la lingua corrente dell’utente
-    # category="config", config_flow=True per usare lo spazio nomi
-    # delle config translations
-    translations = await async_get_translations(
-        hass,
-        language=hass.config.language,  # se None, HA userà la lingua di default
-        category="options",
-        integrations={DOMAIN},
-        config_flow=True,
+async def _async_input_name_templates(
+    hass: HomeAssistant,
+) -> tuple[str, str]:
+    """Return templates for default input names and titles.
+
+    The Home Assistant translation API is relatively expensive, therefore the
+    templates are fetched once per flow and reused when building the form.
+    """
+
+    try:
+        translations = await async_get_translations(
+            hass,
+            language=hass.config.language,
+            category="options",
+            integrations={DOMAIN},
+            config_flow=True,
+        )
+    except Exception:  # pragma: no cover - defensive, HA handles logging
+        _LOGGER.debug("Falling back to default input name templates", exc_info=True)
+        return "Alarm input {number}", "Name of alarm input"
+
+    base_key = f"component.{DOMAIN}.options.step.input_names.data.{{}}"
+    default_template = translations.get(
+        base_key.format("default_input_name"), "Alarm input {number}"
     )
-    # Chiave completa attesa da HA:
-    # component.<domain>.config.step.<step_id>.data.<key>
-    full_key = f"component.{DOMAIN}.options.step.input_names.data.{string}"
-    template = translations.get(full_key, "Alarm input {number}")
-    return template.format(number=number)
+    title_template = translations.get(
+        base_key.format("pre_title"), "Name of alarm input"
+    )
+    return str(default_template), str(title_template)
+
+
+def _format_with_number(template: str, number: int) -> str:
+    """Format a translation template, ignoring missing placeholders."""
+
+    try:
+        return template.format(number=number)
+    except (KeyError, IndexError, ValueError):
+        return template
 
 
 def _user_step_schema(
@@ -291,6 +313,11 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     self._input_names[str(sensor)] = name
 
         self._pending_input_sensor_ids: list[int] | None = None
+        self._input_name_templates: tuple[str, str] | None = None
+        # ``self.hass`` is not available when the options flow handler is
+        # constructed. The active language is captured the first time the
+        # input naming step runs instead.
+        self._input_name_language: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
@@ -494,12 +521,42 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             self._update_config_entry_options()
             return await self.async_step_init()
 
+        hass = self.hass
+        language = getattr(getattr(hass, "config", None), "language", None)
+        if self._input_name_language != language:
+            self._input_name_templates = None
+            self._input_name_language = language
+
+        if self._input_name_templates is None:
+            if hass is None:
+                self._input_name_templates = ("Alarm input {number}", "Name of alarm input")
+            else:
+                self._input_name_templates = await _async_input_name_templates(hass)
+
+        default_template, title_template = self._input_name_templates
+
         errors: dict[str, str] = {}
         collected: dict[str, str] = {}
+        field_labels: dict[int, str] = {}
+        defaults: dict[int, str] = {}
+
+        for sensor in sensor_ids:
+            label = _format_with_number(title_template, sensor)
+            if label == title_template:
+                label = f"{label} {sensor}"
+            field_labels[sensor] = label
+            stored_name = self._input_names.get(str(sensor))
+            if stored_name:
+                defaults[sensor] = stored_name
+                continue
+            fallback = _format_with_number(default_template, sensor)
+            if fallback == default_template:
+                fallback = f"Alarm input {sensor}"
+            defaults[sensor] = fallback
 
         if user_input is not None:
             for sensor in sensor_ids:
-                field = f"input_{sensor}_name"
+                field = field_labels[sensor]
                 raw_value = (user_input.get(field) or "").strip()
                 if not raw_value:
                     errors[field] = "required"
@@ -515,16 +572,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         schema_dict: dict[Any, Any] = {}
         for sensor in sensor_ids:
-            # field = f"input_{sensor}_name"
-            default_name = self._input_names.get(
-                str(sensor)
-            ) or await _translated_default(self.hass, "default_input_name", sensor)
-            try:
-                pre_title = await _translated_default(self.hass, "pre_title", sensor)
-            except Exception:
-                pre_title = "Name of alarm input"
-            field = f"{pre_title} {sensor}"
-            schema_dict[vol.Required(field, default=default_name)] = str
+            field = field_labels[sensor]
+            schema_dict[vol.Required(field, default=defaults[sensor])] = str
 
         schema = vol.Schema(schema_dict)
 
