@@ -12,15 +12,13 @@
                "host":"Host",
                "port":"Port",
                "scan_interval":"Scan interval (seconds)",
-               "sectors":"Number of sectors",
-               "input_sensors":"Alarm inputs"
+               "sectors":"Number of sectors"
             },
             "data_description":{
                "name":"A friendly name for the Alarm (used in entity names).",
                "host":"IP or hostname of the Alarm.",
                "port":"Modbus TCP port, typically 502.",
-               "scan_interval":"Time interval in seconds between alarm state scans.",
-               "input_sensors":"Provide comma-separated alarm input numbers or ranges (e.g. 1-4,6)."
+               "scan_interval":"Time interval in seconds between alarm state scans."
             }
          }
       }
@@ -31,6 +29,7 @@
             "title":"Elmo Modbus options",
             "menu_options":{
                "config":"Edit connection settings",
+               "inputs":"Configure alarm inputs",
                "panels":"Configure panels",
                "add_panel":"Add panel",
                "user_codes":"Manage user codes"
@@ -44,15 +43,33 @@
                "host":"Host",
                "port":"Port",
                "scan_interval":"Scan interval (seconds)",
-               "sectors":"Number of sectors",
-               "input_sensors":"Alarm inputs"
+               "sectors":"Number of sectors"
             },
             "data_description":{
                "name":"A friendly name for the Alarm (used in entity names).",
                "host":"IP or hostname of the Alarm.",
                "port":"Modbus TCP port, typically 502.",
-               "scan_interval":"Time interval in seconds between alarm state scans.",
+               "scan_interval":"Time interval in seconds between alarm state scans."
+            }
+         },
+         "inputs":{
+            "title":"Alarm inputs",
+            "description":"Choose how many alarm inputs to monitor and specify their identifiers. Inputs must be between 1 and {max_input}.",
+            "data":{
+               "count":"Number of inputs",
+               "input_sensors":"Inputs to monitor"
+            },
+            "data_description":{
+               "count":"Total number of alarm inputs to configure.",
                "input_sensors":"Provide comma-separated alarm input numbers or ranges (e.g. 1-4,6)."
+            }
+         },
+         "input_names":{
+            "title":"Name alarm inputs",
+            "description":"Assign a descriptive name to each of the {count} selected alarm inputs.",
+            "data": {
+               "default_input_name": "Alarm input {number}",
+               "pre_title":"Name of input"
             }
          },
          "panels":{
@@ -91,6 +108,7 @@
       "error":{
          "invalid_sector":"Enter sector numbers within the supported range.",
          "invalid_input":"Enter alarm input numbers within the supported range.",
+         "input_count_mismatch":"The number of inputs must match the identifiers you selected.",
          "invalid_slug":"Provide a valid entity ID suffix (lowercase letters, numbers, or underscores).",
          "duplicate_slug":"Each panel must use a unique entity ID suffix.",
          "invalid_panel":"Select a valid panel to edit.",

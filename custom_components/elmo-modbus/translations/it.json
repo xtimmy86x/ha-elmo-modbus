@@ -12,15 +12,13 @@
                "host":"Host",
                "port":"Porta",
                "scan_interval":"Intervallo di scansione (secondi)",
-               "sectors":"Numero di settori",
-               "input_sensors":"Ingressi di allarme"
+               "sectors":"Numero di settori"
             },
             "data_description":{
                "name":"Un nome descrittivo per l'allarme (utilizzato nei nomi delle entità).",
                "host":"Indirizzo IP o hostname dell'allarme.",
                "port":"Porta Modbus TCP, solitamente 502.",
-               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme.",
-               "input_sensors":"Fornisci numeri o intervalli di ingressi di allarme separati da virgole (es. 1-4,6)."
+               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme."
             }
          }
       }
@@ -31,6 +29,7 @@
             "title":"Opzioni Elmo Modbus",
             "menu_options":{
                "config":"Modifica impostazioni connessione",
+               "inputs":"Configura ingressi di allarme",
                "panels":"Configura pannelli",
                "add_panel":"Aggiungi pannello",
                "user_codes":"Gestisci codici utente"
@@ -44,17 +43,35 @@
                "host":"Host",
                "port":"Porta",
                "scan_interval":"Intervallo di scansione (secondi)",
-               "sectors":"Numero di settori",
-               "input_sensors":"Ingressi di allarme"
+               "sectors":"Numero di settori"
             },
             "data_description":{
                "name":"Un nome descrittivo per l'allarme (utilizzato nei nomi delle entità).",
                "host":"Indirizzo IP o hostname dell'allarme.",
                "port":"Porta Modbus TCP, solitamente 502.",
-               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme.",
+               "scan_interval":"Intervallo di tempo in secondi tra le scansioni dello stato dell'allarme."
+            }
+         },
+         "inputs":{
+            "title":"Ingressi di allarme",
+            "description":"Scegli quanti ingressi di allarme monitorare e specifica i loro identificativi. Gli ingressi devono essere compresi tra 1 e {max_input}.",
+            "data":{
+               "count":"Numero di ingressi",
+               "input_sensors":"Ingressi da monitorare"
+            },
+            "data_description":{
+               "count":"Numero totale di ingressi di allarme da configurare.",
                "input_sensors":"Fornisci numeri o intervalli di ingressi di allarme separati da virgole (es. 1-4,6)."
             }
          },
+         "input_names":{
+            "title":"Assegna nomi agli ingressi",
+            "description":"Assegna un nome descrittivo a ciascuno dei {count} ingressi di allarme selezionati.",
+            "data": {
+               "default_input_name": "Ingresso allarme {number}",
+               "pre_title":"Nome dell'ingresso"
+            }
+         },         
          "panels":{
             "title":"Seleziona pannello",
             "description":"Scegli il pannello da modificare. Usa il menu opzioni per aggiungere un nuovo pannello se necessario.",
@@ -91,6 +108,7 @@
       "error":{
          "invalid_sector":"Inserisci numeri di settore nel range supportato.",
          "invalid_input":"Inserisci numeri di ingressi di allarme nell'intervallo supportato.",
+         "input_count_mismatch":"Il numero di ingressi deve corrispondere agli identificativi selezionati.",
          "invalid_slug":"Fornisci un suffisso ID entità valido (solo lettere minuscole, numeri o underscore).",
          "duplicate_slug":"Ogni pannello deve avere un suffisso ID entità univoco.",
          "invalid_panel":"Seleziona un pannello valido da modificare.",
@@ -174,12 +192,12 @@
             "state_off":"No"
          },
          "sectors_inputs_alarm":{
-            "name":"Settori con ingressi in allamrme",
+            "name":"Settori con ingressi in allarme",
             "state_on":"Sì",
             "state_off":"No"
          },
          "sectors_inputs_memory_alarm":{
-            "name":"Settori con ingressi in memoria allamrme",
+            "name":"Settori con ingressi in memoria allarme",
             "state_on":"Sì",
             "state_off":"No"
          },

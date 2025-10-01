@@ -1,10 +1,9 @@
-
 """Helpers for parsing and formatting alarm input selections."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
 import re
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 _INPUT_RANGE_PATTERN = re.compile(r"^(?P<start>\d+)\s*-\s*(?P<end>\d+)$")

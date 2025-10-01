@@ -24,6 +24,7 @@ from .const import (
     DOMAIN,
     INPUT_SENSOR_COUNT,
     INPUT_SENSOR_START,
+    OPTION_INPUT_NAMES,
 )
 from .coordinator import ElmoModbusBinarySensorCoordinator
 from .input_selectors import normalize_input_sensor_config
@@ -158,14 +159,35 @@ async def async_setup_entry(
         "binary_coordinator"
     )
 
-    raw_input_sensors = entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS)
+    raw_input_sensors = entry.options.get(CONF_INPUT_SENSORS)
     input_sensor_ids = normalize_input_sensor_config(
         raw_input_sensors, max_input=INPUT_SENSOR_COUNT
     )
 
     if not input_sensor_ids:
-        fallback_limit = min(DEFAULT_INPUT_SENSORS, INPUT_SENSOR_COUNT)
-        input_sensor_ids = list(range(1, fallback_limit + 1))
+        input_sensor_ids = normalize_input_sensor_config(
+            entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS),
+            max_input=INPUT_SENSOR_COUNT,
+        )
+
+    if not input_sensor_ids:
+        input_sensor_ids = normalize_input_sensor_config(
+            DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
+        )
+
+    raw_names = entry.options.get(OPTION_INPUT_NAMES, {})
+    input_names: dict[int, str] = {}
+    if isinstance(raw_names, dict):
+        for key, value in raw_names.items():
+            try:
+                sensor = int(key)
+            except (TypeError, ValueError):
+                continue
+            if sensor not in input_sensor_ids:
+                continue
+            name = str(value).strip()
+            if name:
+                input_names[sensor] = name
 
     input_descriptions = [
         ElmoBinarySensorDescription(
@@ -174,6 +196,7 @@ async def async_setup_entry(
             translation_placeholders={"index": str(index)},
             address=INPUT_SENSOR_START + index - 1,
             device_class=BinarySensorDeviceClass.SAFETY,
+            name=input_names.get(index),
         )
         for index in input_sensor_ids
     ]

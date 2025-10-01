@@ -10,6 +10,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import selector
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.util import slugify
 
 from .const import (
@@ -22,6 +23,7 @@ from .const import (
     DEFAULT_SECTORS,
     DOMAIN,
     INPUT_SENSOR_COUNT,
+    OPTION_INPUT_NAMES,
     OPTION_USER_CODES,
     REGISTER_STATUS_COUNT,
 )
@@ -37,6 +39,24 @@ DEFAULT_PORT = 502
 _LOGGER = logging.getLogger(__name__)
 
 
+async def _translated_default(hass, string, number: int) -> str:
+    # Recupera le traduzioni per la lingua corrente dell’utente
+    # category="config", config_flow=True per usare lo spazio nomi
+    # delle config translations
+    translations = await async_get_translations(
+        hass,
+        language=hass.config.language,  # se None, HA userà la lingua di default
+        category="options",
+        integrations={DOMAIN},
+        config_flow=True,
+    )
+    # Chiave completa attesa da HA:
+    # component.<domain>.config.step.<step_id>.data.<key>
+    full_key = f"component.{DOMAIN}.options.step.input_names.data.{string}"
+    template = translations.get(full_key, "Alarm input {number}")
+    return template.format(number=number)
+
+
 def _user_step_schema(
     name: str = DEFAULT_NAME,
     host: str = "",
@@ -44,17 +64,8 @@ def _user_step_schema(
     *,
     scan_interval: int = DEFAULT_SCAN_INTERVAL,
     sectors: int = DEFAULT_SECTORS,
-    input_sensors: Any = DEFAULT_INPUT_SENSORS,
 ) -> vol.Schema:
     """Return the schema for the initial configuration step."""
-
-    if isinstance(input_sensors, str):
-        input_default = input_sensors
-    else:
-        normalized = normalize_input_sensor_config(
-            input_sensors, max_input=INPUT_SENSOR_COUNT
-        )
-        input_default = format_input_sensor_list(normalized)
 
     return vol.Schema(
         {
@@ -69,7 +80,6 @@ def _user_step_schema(
             vol.Required("sectors", default=sectors): vol.All(
                 int, vol.Range(min=1, max=DEFAULT_SECTORS)
             ),
-            vol.Required(CONF_INPUT_SENSORS, default=input_default or ""): str,
         }
     )
 
@@ -77,6 +87,7 @@ def _user_step_schema(
 DATA_SCHEMA = _user_step_schema()
 
 MENU_OPTION_CONFIG = "config"
+MENU_OPTION_INPUTS = "inputs"
 MENU_OPTION_PANELS = "panels"
 MENU_OPTION_ADD_PANEL = "add_panel"
 MENU_OPTION_USER_CODES = "user_codes"
@@ -162,14 +173,6 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             port = user_input.get("port", DEFAULT_PORT)
             scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
             sectors = user_input.get("sectors", DEFAULT_SECTORS)
-            raw_input_sensors = user_input.get(CONF_INPUT_SENSORS, "")
-            try:
-                input_sensors = parse_input_sensor_selection(
-                    raw_input_sensors, max_input=INPUT_SENSOR_COUNT
-                )
-            except ValueError:
-                errors[CONF_INPUT_SENSORS] = "invalid_input"
-                input_sensors = []
 
             if not raw_host:
                 errors["host"] = "required"
@@ -183,7 +186,6 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     port=port,
                     scan_interval=scan_interval,
                     sectors=sectors,
-                    input_sensors=raw_input_sensors,
                 )
                 return self.async_show_form(
                     step_id="user",
@@ -200,10 +202,22 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "port": port,
                 CONF_SCAN_INTERVAL: scan_interval,
                 CONF_SECTORS: sectors,
-                CONF_INPUT_SENSORS: input_sensors,
             }
             _LOGGER.debug("Creating config entry with data: %s", data)
-            return self.async_create_entry(title=name, data=data)
+            default_inputs = normalize_input_sensor_config(
+                DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
+            )
+            default_input_names = {
+                str(sensor): f"Alarm input {sensor}" for sensor in default_inputs
+            }
+            return self.async_create_entry(
+                title=name,
+                data=data,
+                options={
+                    CONF_INPUT_SENSORS: default_inputs,
+                    OPTION_INPUT_NAMES: default_input_names,
+                },
+            )
 
         return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
 
@@ -252,6 +266,32 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 if isinstance(code, str) and code.strip():
                     self._user_codes.append(code.strip())
 
+        self._input_sensor_ids: list[int] = normalize_input_sensor_config(
+            config_entry.options.get(CONF_INPUT_SENSORS),
+            max_input=INPUT_SENSOR_COUNT,
+        )
+        if not self._input_sensor_ids:
+            self._input_sensor_ids = normalize_input_sensor_config(
+                config_entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS),
+                max_input=INPUT_SENSOR_COUNT,
+            )
+
+        raw_names = config_entry.options.get(OPTION_INPUT_NAMES, {})
+        self._input_names: dict[str, str] = {}
+        if isinstance(raw_names, dict):
+            for key, value in raw_names.items():
+                try:
+                    sensor = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if sensor not in self._input_sensor_ids:
+                    continue
+                name = str(value).strip()
+                if name:
+                    self._input_names[str(sensor)] = name
+
+        self._pending_input_sensor_ids: list[int] | None = None
+
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
     ) -> FlowResult:
@@ -261,6 +301,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             menu_options={
                 MENU_OPTION_CONFIG,
+                MENU_OPTION_INPUTS,
                 MENU_OPTION_PANELS,
                 MENU_OPTION_ADD_PANEL,
                 MENU_OPTION_USER_CODES,
@@ -278,15 +319,6 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         default_port = current_data.get("port", DEFAULT_PORT)
         default_scan = current_data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         default_sectors = current_data.get(CONF_SECTORS, self._sector_limit)
-        default_inputs = normalize_input_sensor_config(
-            current_data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS),
-            max_input=INPUT_SENSOR_COUNT,
-        )
-        if not default_inputs:
-            default_inputs = normalize_input_sensor_config(
-                DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
-            )
-
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -295,14 +327,6 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             port = user_input.get("port", DEFAULT_PORT)
             scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
             sectors = user_input.get("sectors", default_sectors)
-            raw_input_sensors = user_input.get(CONF_INPUT_SENSORS, "")
-            try:
-                input_sensors = parse_input_sensor_selection(
-                    raw_input_sensors, max_input=INPUT_SENSOR_COUNT
-                )
-            except ValueError:
-                errors[CONF_INPUT_SENSORS] = "invalid_input"
-                input_sensors = default_inputs
 
             if not raw_host:
                 errors["host"] = "required"
@@ -326,7 +350,6 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     "port": port,
                     CONF_SCAN_INTERVAL: scan_interval,
                     CONF_SECTORS: sectors,
-                    CONF_INPUT_SENSORS: input_sensors,
                 }
 
                 self.hass.config_entries.async_update_entry(
@@ -366,7 +389,6 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 port=port,
                 scan_interval=scan_interval,
                 sectors=sectors,
-                input_sensors=raw_input_sensors,
             )
         else:
             schema = _user_step_schema(
@@ -375,13 +397,142 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 port=default_port,
                 scan_interval=default_scan,
                 sectors=default_sectors,
-                input_sensors=default_inputs,
             )
 
         return self.async_show_form(
             step_id="config",
             data_schema=schema,
             errors=errors,
+        )
+
+    async def async_step_inputs(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure which alarm inputs should be monitored."""
+
+        if self._input_sensor_ids:
+            default_inputs = list(self._input_sensor_ids)
+        elif CONF_INPUT_SENSORS in self._config_entry.options:
+            default_inputs = []
+        else:
+            default_inputs = normalize_input_sensor_config(
+                DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
+            )
+        default_count = len(default_inputs)
+        default_value = format_input_sensor_list(default_inputs)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            count = user_input.get("count", default_count)
+            raw_selection = user_input.get(CONF_INPUT_SENSORS, "")
+
+            if count == 0:
+                if raw_selection and raw_selection.strip():
+                    errors[CONF_INPUT_SENSORS] = "invalid_input"
+                else:
+                    self._input_sensor_ids = []
+                    self._input_names = {}
+                    self._pending_input_sensor_ids = None
+                    self._update_config_entry_options()
+                    return await self.async_step_init()
+            else:
+                try:
+                    inputs = parse_input_sensor_selection(
+                        raw_selection, max_input=INPUT_SENSOR_COUNT
+                    )
+                except ValueError:
+                    errors[CONF_INPUT_SENSORS] = "invalid_input"
+                    inputs = default_inputs
+                else:
+                    if len(inputs) != count:
+                        errors["count"] = "input_count_mismatch"
+
+                if not errors:
+                    self._pending_input_sensor_ids = inputs
+                    self._retain_input_names(inputs)
+                    return await self.async_step_input_names()
+
+            schema = vol.Schema(
+                {
+                    vol.Required("count", default=count): vol.All(
+                        int, vol.Range(min=0, max=INPUT_SENSOR_COUNT)
+                    ),
+                    vol.Optional(
+                        CONF_INPUT_SENSORS,
+                        default=raw_selection,
+                    ): str,
+                }
+            )
+        else:
+            schema = vol.Schema(
+                {
+                    vol.Required("count", default=default_count): vol.All(
+                        int, vol.Range(min=0, max=INPUT_SENSOR_COUNT)
+                    ),
+                    vol.Optional(CONF_INPUT_SENSORS, default=default_value): str,
+                }
+            )
+
+        return self.async_show_form(
+            step_id="inputs",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"max_input": str(INPUT_SENSOR_COUNT)},
+        )
+
+    async def async_step_input_names(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Assign names to each configured alarm input."""
+
+        sensor_ids = self._pending_input_sensor_ids or self._input_sensor_ids
+        if not sensor_ids:
+            self._input_sensor_ids = []
+            self._input_names = {}
+            self._pending_input_sensor_ids = None
+            self._update_config_entry_options()
+            return await self.async_step_init()
+
+        errors: dict[str, str] = {}
+        collected: dict[str, str] = {}
+
+        if user_input is not None:
+            for sensor in sensor_ids:
+                field = f"input_{sensor}_name"
+                raw_value = (user_input.get(field) or "").strip()
+                if not raw_value:
+                    errors[field] = "required"
+                else:
+                    collected[str(sensor)] = raw_value
+
+            if not errors:
+                self._input_sensor_ids = sensor_ids
+                self._input_names = collected
+                self._pending_input_sensor_ids = None
+                self._update_config_entry_options()
+                return await self.async_step_init()
+
+        schema_dict: dict[Any, Any] = {}
+        for sensor in sensor_ids:
+            # field = f"input_{sensor}_name"
+            default_name = self._input_names.get(
+                str(sensor)
+            ) or await _translated_default(self.hass, "default_input_name", sensor)
+            try:
+                pre_title = await _translated_default(self.hass, "pre_title", sensor)
+            except Exception:
+                pre_title = "Name of alarm input"
+            field = f"{pre_title} {sensor}"
+            schema_dict[vol.Required(field, default=default_name)] = str
+
+        schema = vol.Schema(schema_dict)
+
+        return self.async_show_form(
+            step_id="input_names",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"count": str(len(sensor_ids))},
         )
 
     async def async_step_add_panel(
@@ -431,10 +582,24 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         options = panels_to_options(self._panels, max_sector=self._sector_limit)
         options[OPTION_USER_CODES] = list(self._user_codes)
+        options[CONF_INPUT_SENSORS] = list(self._input_sensor_ids)
+        options[OPTION_INPUT_NAMES] = {
+            key: value for key, value in self._input_names.items() if key and value
+        }
         self.hass.config_entries.async_update_entry(
             self._config_entry,
             options=options,
         )
+
+    def _retain_input_names(self, sensor_ids: list[int]) -> None:
+        """Preserve configured names for the provided sensor identifiers."""
+
+        existing: dict[str, str] = {}
+        for sensor in sensor_ids:
+            key = str(sensor)
+            if key in self._input_names:
+                existing[key] = self._input_names[key]
+        self._input_names = existing
 
     async def async_step_panels(
         self, user_input: dict[str, Any] | None = None
