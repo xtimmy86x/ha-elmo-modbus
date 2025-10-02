@@ -16,6 +16,39 @@ from .const import DEFAULT_SCAN_INTERVAL, REGISTER_STATUS_COUNT, REGISTER_STATUS
 LOGGER = logging.getLogger(__name__)
 
 
+def _ensure_client_connected(client: ModbusTcpClient) -> None:
+    """Ensure the Modbus client is connected before performing an operation."""
+
+    if client.connected:
+        return
+    if not client.connect():
+        raise ConnectionException("Unable to connect to Modbus device")
+
+
+def _prepare_address_groups(
+    addresses: Iterable[int],
+) -> tuple[tuple[int, ...], tuple[tuple[int, int, tuple[int, ...]], ...]]:
+    """Return a sorted tuple of addresses and grouped spans for Modbus reads."""
+
+    ordered = tuple(sorted({int(address) for address in addresses}))
+    if not ordered:
+        return (), ()
+
+    groups: list[tuple[int, int, tuple[int, ...]]] = []
+    current: list[int] = [ordered[0]]
+
+    for address in ordered[1:]:
+        if address == current[-1] + 1:
+            current.append(address)
+            continue
+        groups.append((current[0], len(current), tuple(current)))
+        current = [address]
+
+    groups.append((current[0], len(current), tuple(current)))
+
+    return ordered, tuple(groups)
+
+
 class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
     """Coordinator responsible for polling the Modbus control panel."""
 
@@ -42,9 +75,7 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
 
         def _read_status() -> list[bool]:
             """Synchronously read the discrete inputs from the device."""
-            if not self._client.connected:
-                if not self._client.connect():
-                    raise ConnectionException("Unable to connect to Modbus device")
+            _ensure_client_connected(self._client)
 
             response = self._client.read_discrete_inputs(
                 REGISTER_STATUS_START, count=self._sector_count
@@ -101,30 +132,15 @@ class ElmoModbusBinarySensorCoordinator(DataUpdateCoordinator[dict[int, bool]]):
             update_interval=timedelta(seconds=max(1, scan_interval)),
         )
         self._client = client
-        ordered = sorted({int(address) for address in addresses})
-        self._addresses: tuple[int, ...] = tuple(ordered)
-        groups: list[list[int]] = []
-        current: list[int] = []
-        for address in ordered:
-            if not current or address == current[-1] + 1:
-                current.append(address)
-                continue
-            groups.append(current)
-            current = [address]
-        if current:
-            groups.append(current)
-
-        self._groups: list[tuple[int, int, tuple[int, ...]]] = [
-            (group[0], len(group), tuple(group)) for group in groups
-        ]
+        ordered, groups = _prepare_address_groups(addresses)
+        self._addresses: tuple[int, ...] = ordered
+        self._groups: list[tuple[int, int, tuple[int, ...]]] = list(groups)
 
     async def _async_update_data(self) -> dict[int, bool]:
         """Poll the Modbus device for diagnostic discrete inputs."""
 
         def _read_group(start: int, count: int) -> list[bool]:
-            if not self._client.connected:
-                if not self._client.connect():
-                    raise ConnectionException("Unable to connect to Modbus device")
+            _ensure_client_connected(self._client)
 
             response = self._client.read_discrete_inputs(start, count=count)
             if not response or getattr(response, "isError", lambda: True)():
@@ -173,30 +189,15 @@ class ElmoModbusSwitchCoordinator(DataUpdateCoordinator[dict[int, bool]]):
             update_interval=timedelta(seconds=max(1, scan_interval)),
         )
         self._client = client
-        ordered = sorted({int(address) for address in addresses})
-        self._addresses: tuple[int, ...] = tuple(ordered)
-        groups: list[list[int]] = []
-        current: list[int] = []
-        for address in ordered:
-            if not current or address == current[-1] + 1:
-                current.append(address)
-                continue
-            groups.append(current)
-            current = [address]
-        if current:
-            groups.append(current)
-
-        self._groups: list[tuple[int, int, tuple[int, ...]]] = [
-            (group[0], len(group), tuple(group)) for group in groups
-        ]
+        ordered, groups = _prepare_address_groups(addresses)
+        self._addresses = ordered
+        self._groups = list(groups)
 
     async def _async_update_data(self) -> dict[int, bool]:
         """Poll the Modbus device for output coil states."""
 
         def _read_group(start: int, count: int) -> list[bool]:
-            if not self._client.connected:
-                if not self._client.connect():
-                    raise ConnectionException("Unable to connect to Modbus device")
+            _ensure_client_connected(self._client)
 
             response = self._client.read_coils(start, count=count)
             if not response or getattr(response, "isError", lambda: True)():
@@ -245,29 +246,14 @@ class ElmoModbusSensorCoordinator(DataUpdateCoordinator[dict[int, int | None]]):
             update_interval=timedelta(seconds=max(1, scan_interval)),
         )
         self._client = client
-        ordered = sorted({int(address) for address in addresses})
-        groups: list[list[int]] = []
-        current: list[int] = []
-        for address in ordered:
-            if not current or address == current[-1] + 1:
-                current.append(address)
-                continue
-            groups.append(current)
-            current = [address]
-        if current:
-            groups.append(current)
-
-        self._groups: list[tuple[int, int, tuple[int, ...]]] = [
-            (group[0], len(group), tuple(group)) for group in groups
-        ]
+        _, groups = _prepare_address_groups(addresses)
+        self._groups = list(groups)
 
     async def _async_update_data(self) -> dict[int, int | None]:
         """Poll the Modbus device for holding registers."""
 
         def _read_group(start: int, count: int) -> list[int]:
-            if not self._client.connected:
-                if not self._client.connect():
-                    raise ConnectionException("Unable to connect to Modbus device")
+            _ensure_client_connected(self._client)
 
             response = self._client.read_holding_registers(start, count=count)
             if not response or getattr(response, "isError", lambda: True)():
