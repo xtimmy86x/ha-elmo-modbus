@@ -22,7 +22,6 @@ from homeassistant.util import slugify
 from .const import (
     CONF_INPUT_SENSORS,
     CONF_SCAN_INTERVAL,
-    DEFAULT_INPUT_SENSORS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     INPUT_SENSOR_COUNT,
@@ -168,15 +167,10 @@ async def async_setup_entry(
         raw_input_sensors, max_input=INPUT_SENSOR_COUNT
     )
 
-    if not input_sensor_ids:
+    if not input_sensor_ids and CONF_INPUT_SENSORS in entry.data:
         input_sensor_ids = normalize_input_sensor_config(
-            entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS),
+            entry.data.get(CONF_INPUT_SENSORS),
             max_input=INPUT_SENSOR_COUNT,
-        )
-
-    if not input_sensor_ids:
-        input_sensor_ids = normalize_input_sensor_config(
-            DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
         )
 
     raw_names = entry.options.get(OPTION_INPUT_NAMES, {})

@@ -18,9 +18,7 @@ from .const import (
     CONF_OUTPUT_SWITCHES,
     CONF_SCAN_INTERVAL,
     CONF_SECTORS,
-    DEFAULT_INPUT_SENSORS,
     DEFAULT_NAME,
-    DEFAULT_OUTPUT_SWITCHES,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SECTORS,
     DOMAIN,
@@ -256,27 +254,9 @@ class ElmoModbusConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_SECTORS: sectors,
             }
             _LOGGER.debug("Creating config entry with data: %s", data)
-            default_inputs = normalize_input_sensor_config(
-                DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
-            )
-            default_input_names = {
-                str(sensor): f"Alarm input {sensor}" for sensor in default_inputs
-            }
-            default_outputs = normalize_input_sensor_config(
-                DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
-            )
-            default_output_names = {
-                str(output): f"Output {output}" for output in default_outputs
-            }
             return self.async_create_entry(
                 title=name,
                 data=data,
-                options={
-                    CONF_INPUT_SENSORS: default_inputs,
-                    OPTION_INPUT_NAMES: default_input_names,
-                    CONF_OUTPUT_SWITCHES: default_outputs,
-                    OPTION_OUTPUT_NAMES: default_output_names,
-                },
             )
 
         return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
@@ -330,9 +310,9 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             config_entry.options.get(CONF_INPUT_SENSORS),
             max_input=INPUT_SENSOR_COUNT,
         )
-        if not self._input_sensor_ids:
+        if not self._input_sensor_ids and CONF_INPUT_SENSORS in config_entry.data:
             self._input_sensor_ids = normalize_input_sensor_config(
-                config_entry.data.get(CONF_INPUT_SENSORS, DEFAULT_INPUT_SENSORS),
+                config_entry.data.get(CONF_INPUT_SENSORS),
                 max_input=INPUT_SENSOR_COUNT,
             )
 
@@ -361,14 +341,10 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             config_entry.options.get(CONF_OUTPUT_SWITCHES),
             max_input=OUTPUT_SWITCH_COUNT,
         )
-        if not self._output_switch_ids:
+        if not self._output_switch_ids and CONF_OUTPUT_SWITCHES in config_entry.data:
             self._output_switch_ids = normalize_input_sensor_config(
-                config_entry.data.get(CONF_OUTPUT_SWITCHES, DEFAULT_OUTPUT_SWITCHES),
+                config_entry.data.get(CONF_OUTPUT_SWITCHES),
                 max_input=OUTPUT_SWITCH_COUNT,
-            )
-        if not self._output_switch_ids:
-            self._output_switch_ids = normalize_input_sensor_config(
-                DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
             )
 
         raw_output_names = config_entry.options.get(OPTION_OUTPUT_NAMES, {})
@@ -510,12 +486,13 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         if self._input_sensor_ids:
             default_inputs = list(self._input_sensor_ids)
-        elif CONF_INPUT_SENSORS in self._config_entry.options:
-            default_inputs = []
-        else:
+        elif CONF_INPUT_SENSORS in self._config_entry.data:
             default_inputs = normalize_input_sensor_config(
-                DEFAULT_INPUT_SENSORS, max_input=INPUT_SENSOR_COUNT
+                self._config_entry.data.get(CONF_INPUT_SENSORS),
+                max_input=INPUT_SENSOR_COUNT,
             )
+        else:
+            default_inputs = []
         default_count = len(default_inputs)
         default_value = format_input_sensor_list(default_inputs)
 
@@ -665,12 +642,13 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         if self._output_switch_ids:
             default_outputs = list(self._output_switch_ids)
-        elif CONF_OUTPUT_SWITCHES in self._config_entry.options:
-            default_outputs = []
-        else:
+        elif CONF_OUTPUT_SWITCHES in self._config_entry.data:
             default_outputs = normalize_input_sensor_config(
-                DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
+                self._config_entry.data.get(CONF_OUTPUT_SWITCHES),
+                max_input=OUTPUT_SWITCH_COUNT,
             )
+        else:
+            default_outputs = []
 
         default_count = len(default_outputs)
         default_value = format_input_sensor_list(default_outputs)

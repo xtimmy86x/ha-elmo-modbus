@@ -20,7 +20,6 @@ from pymodbus.exceptions import ConnectionException
 from .const import (
     CONF_OUTPUT_SWITCHES,
     CONF_SCAN_INTERVAL,
-    DEFAULT_OUTPUT_SWITCHES,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     OPTION_OUTPUT_NAMES,
@@ -55,15 +54,10 @@ async def async_setup_entry(
         raw_switches, max_input=OUTPUT_SWITCH_COUNT
     )
 
-    if not switch_ids:
+    if not switch_ids and CONF_OUTPUT_SWITCHES in entry.data:
         switch_ids = normalize_input_sensor_config(
-            entry.data.get(CONF_OUTPUT_SWITCHES, DEFAULT_OUTPUT_SWITCHES),
+            entry.data.get(CONF_OUTPUT_SWITCHES),
             max_input=OUTPUT_SWITCH_COUNT,
-        )
-
-    if not switch_ids:
-        switch_ids = normalize_input_sensor_config(
-            DEFAULT_OUTPUT_SWITCHES, max_input=OUTPUT_SWITCH_COUNT
         )
 
     raw_names = entry.options.get(OPTION_OUTPUT_NAMES, {})
