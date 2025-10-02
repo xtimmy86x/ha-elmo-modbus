@@ -18,12 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
-from .const import (
-    DEFAULT_SECTORS,
-    DOMAIN,
-    OPTION_USER_CODES,
-    REGISTER_COMMAND_START,
-)
+from .const import DEFAULT_SECTORS, DOMAIN, OPTION_USER_CODES, REGISTER_COMMAND_START
 from .coordinator import ElmoModbusCoordinator
 from .panels import MODES, PanelDefinition, load_panel_definitions
 
@@ -153,9 +148,7 @@ class ElmoModbusAlarmControlPanel(
     ) -> list[bool]:
         """Convert a sector iterable into a bit payload for the command coils."""
 
-        if (current := self.coordinator.data) and len(
-            current
-        ) >= DEFAULT_SECTORS:
+        if (current := self.coordinator.data) and len(current) >= DEFAULT_SECTORS:
             payload = list(current[:DEFAULT_SECTORS])
         else:
             payload = [False] * DEFAULT_SECTORS

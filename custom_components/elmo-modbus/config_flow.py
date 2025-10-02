@@ -22,11 +22,10 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_SECTORS,
     DOMAIN,
-    INPUT_SENSOR_COUNT,
+    INOUT_MAX_COUNT,
     OPTION_INPUT_NAMES,
     OPTION_OUTPUT_NAMES,
     OPTION_USER_CODES,
-    OUTPUT_SWITCH_COUNT,
 )
 from .input_selectors import (
     format_input_sensor_list,
@@ -307,12 +306,12 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         self._input_sensor_ids: list[int] = normalize_input_sensor_config(
             config_entry.options.get(CONF_INPUT_SENSORS),
-            max_input=INPUT_SENSOR_COUNT,
+            max_input=INOUT_MAX_COUNT,
         )
         if not self._input_sensor_ids and CONF_INPUT_SENSORS in config_entry.data:
             self._input_sensor_ids = normalize_input_sensor_config(
                 config_entry.data.get(CONF_INPUT_SENSORS),
-                max_input=INPUT_SENSOR_COUNT,
+                max_input=INOUT_MAX_COUNT,
             )
 
         raw_names = config_entry.options.get(OPTION_INPUT_NAMES, {})
@@ -338,12 +337,12 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
 
         self._output_switch_ids: list[int] = normalize_input_sensor_config(
             config_entry.options.get(CONF_OUTPUT_SWITCHES),
-            max_input=OUTPUT_SWITCH_COUNT,
+            max_input=INOUT_MAX_COUNT,
         )
         if not self._output_switch_ids and CONF_OUTPUT_SWITCHES in config_entry.data:
             self._output_switch_ids = normalize_input_sensor_config(
                 config_entry.data.get(CONF_OUTPUT_SWITCHES),
-                max_input=OUTPUT_SWITCH_COUNT,
+                max_input=INOUT_MAX_COUNT,
             )
 
         raw_output_names = config_entry.options.get(OPTION_OUTPUT_NAMES, {})
@@ -488,7 +487,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         elif CONF_INPUT_SENSORS in self._config_entry.data:
             default_inputs = normalize_input_sensor_config(
                 self._config_entry.data.get(CONF_INPUT_SENSORS),
-                max_input=INPUT_SENSOR_COUNT,
+                max_input=INOUT_MAX_COUNT,
             )
         else:
             default_inputs = []
@@ -513,7 +512,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             else:
                 try:
                     inputs = parse_input_sensor_selection(
-                        raw_selection, max_input=INPUT_SENSOR_COUNT
+                        raw_selection, max_input=INOUT_MAX_COUNT
                     )
                 except ValueError:
                     errors[CONF_INPUT_SENSORS] = "invalid_input"
@@ -530,7 +529,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             schema = vol.Schema(
                 {
                     vol.Required("count", default=count): vol.All(
-                        int, vol.Range(min=0, max=INPUT_SENSOR_COUNT)
+                        int, vol.Range(min=0, max=INOUT_MAX_COUNT)
                     ),
                     vol.Optional(
                         CONF_INPUT_SENSORS,
@@ -542,7 +541,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             schema = vol.Schema(
                 {
                     vol.Required("count", default=default_count): vol.All(
-                        int, vol.Range(min=0, max=INPUT_SENSOR_COUNT)
+                        int, vol.Range(min=0, max=INOUT_MAX_COUNT)
                     ),
                     vol.Optional(CONF_INPUT_SENSORS, default=default_value): str,
                 }
@@ -552,7 +551,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="inputs",
             data_schema=schema,
             errors=errors,
-            description_placeholders={"max_input": str(INPUT_SENSOR_COUNT)},
+            description_placeholders={"max_input": str(INOUT_MAX_COUNT)},
         )
 
     async def async_step_input_names(
@@ -644,7 +643,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         elif CONF_OUTPUT_SWITCHES in self._config_entry.data:
             default_outputs = normalize_input_sensor_config(
                 self._config_entry.data.get(CONF_OUTPUT_SWITCHES),
-                max_input=OUTPUT_SWITCH_COUNT,
+                max_input=INOUT_MAX_COUNT,
             )
         else:
             default_outputs = []
@@ -670,7 +669,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             else:
                 try:
                     outputs = parse_input_sensor_selection(
-                        raw_selection, max_input=OUTPUT_SWITCH_COUNT
+                        raw_selection, max_input=INOUT_MAX_COUNT
                     )
                 except ValueError:
                     errors[CONF_OUTPUT_SWITCHES] = "invalid_output"
@@ -687,7 +686,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             schema = vol.Schema(
                 {
                     vol.Required("count", default=count): vol.All(
-                        int, vol.Range(min=0, max=OUTPUT_SWITCH_COUNT)
+                        int, vol.Range(min=0, max=INOUT_MAX_COUNT)
                     ),
                     vol.Optional(
                         CONF_OUTPUT_SWITCHES,
@@ -699,7 +698,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             schema = vol.Schema(
                 {
                     vol.Required("count", default=default_count): vol.All(
-                        int, vol.Range(min=0, max=OUTPUT_SWITCH_COUNT)
+                        int, vol.Range(min=0, max=INOUT_MAX_COUNT)
                     ),
                     vol.Optional(CONF_OUTPUT_SWITCHES, default=default_value): str,
                 }
@@ -709,7 +708,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="outputs",
             data_schema=schema,
             errors=errors,
-            description_placeholders={"max_output": str(OUTPUT_SWITCH_COUNT)},
+            description_placeholders={"max_output": str(INOUT_MAX_COUNT)},
         )
 
     async def async_step_output_names(

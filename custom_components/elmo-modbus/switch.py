@@ -22,8 +22,8 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    INOUT_MAX_COUNT,
     OPTION_OUTPUT_NAMES,
-    OUTPUT_SWITCH_COUNT,
     OUTPUT_SWITCH_START,
 )
 from .coordinator import ElmoModbusSwitchCoordinator
@@ -50,14 +50,12 @@ async def async_setup_entry(
     client: ModbusTcpClient = data["client"]
 
     raw_switches = entry.options.get(CONF_OUTPUT_SWITCHES)
-    switch_ids = normalize_input_sensor_config(
-        raw_switches, max_input=OUTPUT_SWITCH_COUNT
-    )
+    switch_ids = normalize_input_sensor_config(raw_switches, max_input=INOUT_MAX_COUNT)
 
     if not switch_ids and CONF_OUTPUT_SWITCHES in entry.data:
         switch_ids = normalize_input_sensor_config(
             entry.data.get(CONF_OUTPUT_SWITCHES),
-            max_input=OUTPUT_SWITCH_COUNT,
+            max_input=INOUT_MAX_COUNT,
         )
 
     raw_names = entry.options.get(OPTION_OUTPUT_NAMES, {})

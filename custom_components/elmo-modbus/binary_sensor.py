@@ -24,7 +24,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    INPUT_SENSOR_COUNT,
+    INOUT_MAX_COUNT,
     INPUT_SENSOR_START,
     OPTION_INPUT_NAMES,
 )
@@ -164,13 +164,13 @@ async def async_setup_entry(
 
     raw_input_sensors = entry.options.get(CONF_INPUT_SENSORS)
     input_sensor_ids = normalize_input_sensor_config(
-        raw_input_sensors, max_input=INPUT_SENSOR_COUNT
+        raw_input_sensors, max_input=INOUT_MAX_COUNT
     )
 
     if not input_sensor_ids and CONF_INPUT_SENSORS in entry.data:
         input_sensor_ids = normalize_input_sensor_config(
             entry.data.get(CONF_INPUT_SENSORS),
-            max_input=INPUT_SENSOR_COUNT,
+            max_input=INOUT_MAX_COUNT,
         )
 
     raw_names = entry.options.get(OPTION_INPUT_NAMES, {})
