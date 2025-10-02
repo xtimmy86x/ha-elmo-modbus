@@ -5,8 +5,6 @@ PLATFORMS = ["alarm_control_panel", "binary_sensor", "sensor", "switch"]
 DEFAULT_SCAN_INTERVAL = 1  # in seconds
 DEFAULT_NAME = "Elmo Modbus"
 DEFAULT_SECTORS = 64
-DEFAULT_INPUT_SENSORS = "1-16"
-DEFAULT_OUTPUT_SWITCHES = "1-16"
 
 CONF_SECTORS = "sectors"
 CONF_SCAN_INTERVAL = "scan_interval"
@@ -27,10 +25,7 @@ OPTION_OUTPUT_NAMES = "output_names"
 # a span of 64 bits.  Each bit represents whether the corresponding sector is
 # armed (``True``) or disarmed (``False``).
 REGISTER_STATUS_START = 12289
-REGISTER_STATUS_COUNT = 64
-
 REGISTER_COMMAND_START = 12289
-REGISTER_COMMAND_COUNT = 64
 
 INPUT_SENSOR_START = 4097
 INPUT_SENSOR_COUNT = 1024

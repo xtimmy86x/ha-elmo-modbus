@@ -8,12 +8,12 @@ from typing import Any, Iterable, Mapping, Sequence
 from homeassistant.util import slugify
 
 from .const import (
+    DEFAULT_SECTORS,
     OPTION_ARMED_AWAY_SECTORS,
     OPTION_ARMED_HOME_SECTORS,
     OPTION_ARMED_NIGHT_SECTORS,
     OPTION_DISARM_SECTORS,
     OPTION_PANELS,
-    REGISTER_STATUS_COUNT,
 )
 
 LEGACY_OPTION_MAP = {
@@ -26,7 +26,7 @@ MODES: tuple[str, ...] = tuple(LEGACY_OPTION_MAP)
 
 
 def _sanitize_sectors(
-    values: Iterable[Any] | None, *, max_sector: int = REGISTER_STATUS_COUNT
+    values: Iterable[Any] | None, *, max_sector: int = DEFAULT_SECTORS
 ) -> set[int]:
     """Return a sanitised set of sector identifiers."""
 
@@ -76,7 +76,7 @@ class PanelDefinition:
 
     @property
     def managed_sectors(self) -> set[int]:
-        """Return the union of all sectors controlled by the panel."""
+        """Return the union of all sectors controller DEFAULT_SECTORS by the panel."""
 
         sectors: set[int] = set()
         for mode_sectors in self.modes.values():
@@ -102,7 +102,7 @@ class PanelDefinition:
         *,
         used_slugs: set[str],
         default_index: int,
-        max_sector: int = REGISTER_STATUS_COUNT,
+        max_sector: int = DEFAULT_SECTORS,
     ) -> PanelDefinition:
         """Create a panel definition from stored options."""
 
@@ -128,7 +128,7 @@ class PanelDefinition:
         options: Mapping[str, Any],
         *,
         used_slugs: set[str],
-        max_sector: int = REGISTER_STATUS_COUNT,
+        max_sector: int = DEFAULT_SECTORS,
     ) -> PanelDefinition:
         """Create a panel definition from legacy options."""
 
@@ -164,7 +164,7 @@ class PanelDefinition:
 
 
 def load_panel_definitions(
-    options: Mapping[str, Any], *, max_sector: int = REGISTER_STATUS_COUNT
+    options: Mapping[str, Any], *, max_sector: int = DEFAULT_SECTORS
 ) -> list[PanelDefinition]:
     """Return the configured panels for the given options mapping."""
 
@@ -195,7 +195,7 @@ def load_panel_definitions(
 
 
 def panels_to_options(
-    raw_panels: Sequence[Mapping[str, Any]], *, max_sector: int = REGISTER_STATUS_COUNT
+    raw_panels: Sequence[Mapping[str, Any]], *, max_sector: int = DEFAULT_SECTORS
 ) -> dict[str, Any]:
     """Normalise user-provided panels and return the options payload."""
 

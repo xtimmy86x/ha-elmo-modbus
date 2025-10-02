@@ -19,9 +19,9 @@ from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
 from .const import (
+    DEFAULT_SECTORS,
     DOMAIN,
     OPTION_USER_CODES,
-    REGISTER_COMMAND_COUNT,
     REGISTER_COMMAND_START,
 )
 from .coordinator import ElmoModbusCoordinator
@@ -155,12 +155,12 @@ class ElmoModbusAlarmControlPanel(
 
         if (current := self.coordinator.data) and len(
             current
-        ) >= REGISTER_COMMAND_COUNT:
-            payload = list(current[:REGISTER_COMMAND_COUNT])
+        ) >= DEFAULT_SECTORS:
+            payload = list(current[:DEFAULT_SECTORS])
         else:
-            payload = [False] * REGISTER_COMMAND_COUNT
+            payload = [False] * DEFAULT_SECTORS
         for sector in target_sectors:
-            if 1 <= sector <= REGISTER_COMMAND_COUNT:
+            if 1 <= sector <= DEFAULT_SECTORS:
                 payload[sector - 1] = value
         return payload
 

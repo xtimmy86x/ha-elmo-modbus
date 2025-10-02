@@ -27,7 +27,6 @@ from .const import (
     OPTION_OUTPUT_NAMES,
     OPTION_USER_CODES,
     OUTPUT_SWITCH_COUNT,
-    REGISTER_STATUS_COUNT,
 )
 from .input_selectors import (
     format_input_sensor_list,
@@ -278,8 +277,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         """Initialise the options flow."""
 
         self._config_entry = config_entry
-        sector_limit = int(config_entry.data.get(CONF_SECTORS, REGISTER_STATUS_COUNT))
-        self._sector_limit = max(1, min(sector_limit, REGISTER_STATUS_COUNT))
+        sector_limit = int(config_entry.data.get(CONF_SECTORS, DEFAULT_SECTORS))
+        self._sector_limit = max(1, min(sector_limit, DEFAULT_SECTORS))
         definitions = load_panel_definitions(
             config_entry.options, max_sector=self._sector_limit
         )
@@ -433,7 +432,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     unique_id=unique_id,
                 )
 
-                sector_limit = max(1, min(sectors, REGISTER_STATUS_COUNT))
+                sector_limit = max(1, min(sectors, DEFAULT_SECTORS))
                 if sector_limit != self._sector_limit:
                     for panel in self._panels:
                         sanitized_modes: dict[str, list[int]] = {}
