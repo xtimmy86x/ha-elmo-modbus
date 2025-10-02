@@ -154,9 +154,7 @@ async def async_setup_entry(
         async_add_entities(entities)
 
 
-class ElmoModbusSwitch(
-    CoordinatorEntity[ElmoModbusSwitchCoordinator], SwitchEntity
-):
+class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusSwitchCoordinator], SwitchEntity):
     """Representation of an Elmo Modbus output switch."""
 
     _attr_has_entity_name = True
