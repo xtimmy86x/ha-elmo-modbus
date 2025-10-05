@@ -35,7 +35,7 @@ A polished Home Assistant integration for supervising and controlling Elmo alarm
 - **Flexible panel definitions** – create multiple virtual panels with custom names and sector assignments for away/home/night modes, letting you mirror the arming scenarios available on your Elmo hardware.
 - **Alarm control panel entity** – arm, disarm, and monitor the panel state in real time. Optional code validation prevents unauthorised actions from automations or dashboard widgets.
 - **Rich diagnostics** – leverage built-in binary sensors covering power, tamper, communication, and sector diagnostics alongside optional per-input binary sensors mapped to Modbus discrete inputs.
-- **Environmental insights** – monitor panel temperature with a dedicated sensor sourced from Modbus holding registers.【F:custom_components/elmo-modbus/sensor.py†L1-L68】
+- **Environmental insights** – monitor panel temperature with a dedicated sensor sourced from Modbus holding registers.
 - **Output control** – toggle Modbus-controlled relays or programmable outputs through Home Assistant switch entities, complete with custom naming support.
 - **Responsive updates** – low-latency polling (default 1s) keeps entity state in sync while still letting you tune the scan interval to suit your network.
 
