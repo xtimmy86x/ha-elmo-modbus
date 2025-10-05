@@ -140,7 +140,7 @@ class ElmoModbusAlarmControlPanel(
             return sectors
         raise HomeAssistantError(
             f"No sectors configured for {MODE_LABELS.get(mode, mode)}"
-            "on panel {self._panel.name}"
+            f"on panel {self._panel.name}"
         )
 
     def _build_command_payload(
