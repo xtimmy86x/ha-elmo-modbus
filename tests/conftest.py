@@ -99,6 +99,25 @@ def pytest_configure() -> None:
     sys.modules["homeassistant.helpers"] = helpers_module
     ha_module.helpers = helpers_module  # type: ignore[attr-defined]
 
+    # homeassistant.helpers.config_validation
+    config_validation_module = types.ModuleType(
+        "homeassistant.helpers.config_validation"
+    )
+
+    def config_entry_only_config_schema(domain: str) -> Callable[[Any], Any]:
+        """Return a pass-through schema callable for tests."""
+
+        def _schema(value: Any) -> Any:
+            return value
+
+        return _schema
+
+    config_validation_module.config_entry_only_config_schema = (
+        config_entry_only_config_schema  # type: ignore[attr-defined]
+    )
+    sys.modules["homeassistant.helpers.config_validation"] = config_validation_module
+    helpers_module.config_validation = config_validation_module  # type: ignore[attr-defined]
+
     # homeassistant.helpers.translation
     translation_module = types.ModuleType("homeassistant.helpers.translation")
 
@@ -187,3 +206,77 @@ def pytest_configure() -> None:
     pymodbus_module.client = pymodbus_client_module  # type: ignore[attr-defined]
     pymodbus_module.exceptions = pymodbus_exceptions_module  # type: ignore[attr-defined]
     sys.modules["pymodbus"] = pymodbus_module
+
+    # voluptuous
+    voluptuous_module = types.ModuleType("voluptuous")
+
+    class Invalid(Exception):
+        """Exception raised when validation fails."""
+
+    class Required:
+        def __init__(self, key: str, default: Any | types.EllipsisType = ...):
+            self.key = key
+            self.default = default
+
+    class Range:
+        def __init__(self, *, min: int | None = None, max: int | None = None) -> None:
+            self.min = min
+            self.max = max
+
+        def __call__(self, value: int) -> int:
+            if not isinstance(value, int):
+                raise Invalid("not an integer")
+            if self.min is not None and value < self.min:
+                raise Invalid("value too small")
+            if self.max is not None and value > self.max:
+                raise Invalid("value too large")
+            return value
+
+    class All:
+        def __init__(self, *validators: Callable[[Any], Any]) -> None:
+            self.validators = validators
+
+        def __call__(self, value: Any) -> Any:
+            result = value
+            for validator in self.validators:
+                result = _apply_validator(validator, result)
+            return result
+
+    def _apply_validator(validator: Callable[[Any], Any] | type, value: Any) -> Any:
+        if isinstance(validator, All):
+            return validator(value)
+        if isinstance(validator, Range):
+            return validator(value)
+        return validator(value)  # type: ignore[call-arg]
+
+    class Schema:
+        def __init__(self, schema: dict[Any, Any]) -> None:
+            self._schema = schema
+
+        def __call__(self, data: dict[str, Any]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, validator in self._schema.items():
+                default = ...
+                if isinstance(key, Required):
+                    name = key.key
+                    default = key.default
+                else:
+                    name = key
+                if name in data:
+                    value = data[name]
+                elif default is not ...:
+                    value = default
+                else:
+                    raise Invalid(f"missing required key: {name}")
+                result[name] = _apply_validator(validator, value)
+            # Preserve extra values untouched
+            for name, value in data.items():
+                result.setdefault(name, value)
+            return result
+
+    voluptuous_module.Invalid = Invalid  # type: ignore[attr-defined]
+    voluptuous_module.Required = Required  # type: ignore[attr-defined]
+    voluptuous_module.All = All  # type: ignore[attr-defined]
+    voluptuous_module.Range = Range  # type: ignore[attr-defined]
+    voluptuous_module.Schema = Schema  # type: ignore[attr-defined]
+    sys.modules["voluptuous"] = voluptuous_module
