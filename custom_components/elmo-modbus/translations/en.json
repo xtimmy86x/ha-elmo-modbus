@@ -146,95 +146,131 @@
       "binary_sensor":{
          "central_power_fault":{
             "name":"Control panel power fault",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "central_battery_fault":{
             "name":"Control panel battery fault",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "central_tamper_fault":{
             "name":"Control panel tamper fault",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "pstn_fault":{
             "name":"PSTN fault",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "cellular_fault":{
             "name":"Cellular fault",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "sensor_power_fault_1":{
             "name":"Sensor supply fault 1",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "sensor_power_fault_2":{
             "name":"Sensor supply fault 2",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
          "siren_power_fault":{
             "name":"Siren supply fault",
-            "state_on":"Fault",
-            "state_off":"Normal"
+            "state":{
+               "on":"Fault",
+               "off":"Normal"
+            }
          },
-         "central_alarm":{
+         "central_general_alarm":{
             "name":"General control panel alarm",
-            "state_on":"Alarm",
-            "state_off":"No alarm"
+            "state":{
+               "on":"Alarm",
+               "off":"No alarm"
+            }
          },
          "central_general_tamper":{
             "name":"General control panel tamper",
-            "state_on":"Tamper",
-            "state_off":"Clear"
+            "state":{
+               "on":"Tamper",
+               "off":"Clear"
+            }
          },
          "input_alarm":{
             "name":"Alarm input {index}",
-            "state_on":"Alarm",
-            "state_off":"Normal"
+            "state":{
+               "on":"Alarm",
+               "off":"Normal"
+            }
          },
          "sectors_not_armable":{
             "name":"Sectors not armable",
-            "state_on":"Yes",
-            "state_off":"No"
+            "state":{
+               "on":"Yes",
+               "off":"No"
+            }
          },
          "sectors_inserted":{
             "name":"Sectors inserted",
-            "state_on":"Yes",
-            "state_off":"No"
+            "state":{
+               "on":"Yes",
+               "off":"No"
+            }
          },
          "sectors_inserted_max_security":{
             "name":"Sectors inserted in maximum security",
-            "state_on":"Yes",
-            "state_off":"No"
+            "state":{
+               "on":"Yes",
+               "off":"No"
+            }
          },
          "sectors_inputs_alarm":{
             "name":"Sectors with alarmed inputs",
-            "state_on":"Yes",
-            "state_off":"No"
+            "state":{
+               "on":"Yes",
+               "off":"No"
+            }
          },
          "sectors_inputs_memory_alarm":{
-            "name":"SSectors with alarmed memory inputs",
-            "state_on":"Yes",
-            "state_off":"No"
+            "name":"Sectors with alarmed memory inputs",
+            "state":{
+               "on":"Yes",
+               "off":"No"
+            }
          },
          "excluded_zones":{
             "name":"Excluded zones",
-            "state_on":"Yes",
-            "state_off":"No"
+            "state":{
+               "on":"Yes",
+               "off":"No"
+            }
          }
       },
       "switch":{
          "output_switch":{
             "name":"Output {index}",
-            "state_on":"On",
-            "state_off":"Off"
+            "state":{
+               "on":"On",
+               "off":"Off"
+            }
          }
       },
       "sensor":{
