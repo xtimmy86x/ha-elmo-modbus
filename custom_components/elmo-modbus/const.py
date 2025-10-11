@@ -20,10 +20,7 @@ OPTION_USER_CODES = "user_codes"
 OPTION_INPUT_NAMES = "input_names"
 OPTION_OUTPUT_NAMES = "output_names"
 
-# The panel exposes the arming status for up to 64 sectors through the Modbus
-# discrete input range ``0x3001``-``0x3040`` (FC2), i.e. address ``12289`` with
-# a span of 64 bits.  Each bit represents whether the corresponding sector is
-# armed (``True``) or disarmed (``False``).
+REGISTER_ALARM_START = 5121
 REGISTER_STATUS_START = 12289
 REGISTER_COMMAND_START = 12289
 

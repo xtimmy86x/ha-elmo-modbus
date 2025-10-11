@@ -19,7 +19,7 @@ from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
 from .const import DEFAULT_SECTORS, DOMAIN, OPTION_USER_CODES, REGISTER_COMMAND_START
-from .coordinator import ElmoModbusCoordinator
+from .coordinator import ElmoModbusCoordinator, ElmoPanelStatus
 from .panels import MODES, PanelDefinition, load_panel_definitions
 
 MODE_LABELS = {
@@ -148,13 +148,28 @@ class ElmoModbusAlarmControlPanel(
     ) -> list[bool]:
         """Convert a sector iterable into a bit payload for the command coils."""
 
-        if (current := self.coordinator.data) and len(current) >= DEFAULT_SECTORS:
-            payload = list(current[:DEFAULT_SECTORS])
+        current: ElmoPanelStatus | None = self.coordinator.data
+        if current:
+            payload = list(current.armed)
         else:
-            payload = [False] * DEFAULT_SECTORS
-        for sector in target_sectors:
-            if 1 <= sector <= DEFAULT_SECTORS:
-                payload[sector - 1] = value
+            span = max(1, min(self.coordinator.sector_count, DEFAULT_SECTORS))
+            payload = [False] * span
+
+        span = len(payload)
+
+        if self._managed_sectors:
+            scope = {sector for sector in self._managed_sectors if 1 <= sector <= span}
+        else:
+            scope = set(range(1, span + 1))
+
+        targets = {
+            sector
+            for sector in target_sectors
+            if 1 <= sector <= span and sector in scope
+        }
+
+        for sector in scope:
+            payload[sector - 1] = value if sector in targets else False
         return payload
 
     async def _async_send_command(
@@ -230,22 +245,31 @@ class ElmoModbusAlarmControlPanel(
     def alarm_state(self) -> AlarmControlPanelState | None:
         """Return the current state of the alarm panel."""
 
-        bits = self.coordinator.data
-        if bits is None:
+        status = self.coordinator.data
+        if status is None:
             return None
 
+        armed_bits = status.armed
+        triggered_bits = status.triggered
+
         # settori armati globali (1-based)
-        armed_sectors_all = {i + 1 for i, b in enumerate(bits) if bool(b)}
+        armed_sectors_all = {i + 1 for i, b in enumerate(armed_bits) if bool(b)}
+        triggered_sectors_all = {i + 1 for i, b in enumerate(triggered_bits) if bool(b)}
 
         # limita la vista del pannello ai soli settori gestiti (se definiti)
         if self._managed_sectors:
             panel_armed_sectors = armed_sectors_all & self._managed_sectors
+            panel_triggered_sectors = triggered_sectors_all & self._managed_sectors & panel_armed_sectors
             panel_total = len(self._managed_sectors)
         else:
             panel_armed_sectors = armed_sectors_all
-            panel_total = len(bits)
+            panel_triggered_sectors = triggered_sectors_all & panel_armed_sectors
+            panel_total = len(armed_bits)
 
         panel_armed_count = len(panel_armed_sectors)
+
+        if panel_triggered_sectors:
+            return AlarmControlPanelState.TRIGGERED
 
         # SE tutti i settori gestiti dal pannello sono disarmati -> DISARMED
         if panel_armed_count == 0:
@@ -292,30 +316,41 @@ class ElmoModbusAlarmControlPanel(
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose additional panel metadata."""
-        bits = self.coordinator.data
-        if bits is None:
+        status = self.coordinator.data
+        if status is None:
             return {}
 
-        armed_sectors_all = {i + 1 for i, bit in enumerate(bits) if bit}
-        disarmed_sectors_all = {i + 1 for i, bit in enumerate(bits) if not bit}
+        armed_bits = status.armed
+        triggered_bits = status.triggered
+        armed_sectors_all = {i + 1 for i, bit in enumerate(armed_bits) if bit}
+        disarmed_sectors_all = {i + 1 for i, bit in enumerate(armed_bits) if not bit}
+        triggered_sectors_all = {i + 1 for i, bit in enumerate(triggered_bits) if bit}
 
         # limita la vista al pannello
         if self._managed_sectors:
             scope = sorted(self._managed_sectors)
             armed_sectors = sorted(armed_sectors_all & self._managed_sectors)
             disarmed_sectors = sorted(disarmed_sectors_all & self._managed_sectors)
+            triggered_sectors = sorted(
+                triggered_sectors_all & self._managed_sectors
+            )
             # ricostruisco i bit solo per i settori gestiti
-            raw_bits = [bool(bits[i - 1]) for i in scope]
+            raw_bits = [bool(armed_bits[i - 1]) for i in scope]
+            raw_trigger_bits = [bool(triggered_bits[i - 1]) for i in scope]
         else:
-            scope = list(range(1, len(bits) + 1))
+            scope = list(range(1, len(armed_bits) + 1))
             armed_sectors = sorted(armed_sectors_all)
             disarmed_sectors = sorted(disarmed_sectors_all)
-            raw_bits = list(bits)
+            triggered_sectors = sorted(triggered_sectors_all)
+            raw_bits = list(armed_bits)
+            raw_trigger_bits = list(triggered_bits)
 
         result = {
             "armed_sectors": armed_sectors,
             "disarmed_sectors": disarmed_sectors,
             "raw_sector_bits": raw_bits,
+            "triggered_sectors": triggered_sectors,
+            "raw_trigger_bits": raw_trigger_bits,
             "panel_managed_sectors": scope,
             "panel_slug": self._panel.slug,
         }

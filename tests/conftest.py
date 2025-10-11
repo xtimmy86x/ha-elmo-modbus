@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 import pathlib
 import sys
 import types
@@ -58,6 +59,44 @@ def pytest_configure() -> None:
     data_entry_flow_module.FlowResult = dict  # type: ignore[attr-defined]
     sys.modules["homeassistant.data_entry_flow"] = data_entry_flow_module
     ha_module.data_entry_flow = data_entry_flow_module  # type: ignore[attr-defined]
+
+    # homeassistant.components.alarm_control_panel
+    alarm_module = types.ModuleType("homeassistant.components.alarm_control_panel")
+
+    class AlarmControlPanelEntity:  # pragma: no cover - structural stub
+        pass
+
+    class AlarmControlPanelEntityFeature(enum.IntFlag):  # type: ignore[misc]
+        NONE = 0
+        ARM_AWAY = 1
+        ARM_HOME = 2
+        ARM_NIGHT = 4
+
+    class AlarmControlPanelState(enum.Enum):
+        DISARMED = "disarmed"
+        ARMED_HOME = "armed_home"
+        ARMED_NIGHT = "armed_night"
+        ARMED_AWAY = "armed_away"
+        ARMED_CUSTOM_BYPASS = "armed_custom_bypass"
+        TRIGGERED = "triggered"
+
+    alarm_module.AlarmControlPanelEntity = AlarmControlPanelEntity  # type: ignore[attr-defined]
+    alarm_module.AlarmControlPanelEntityFeature = AlarmControlPanelEntityFeature  # type: ignore[attr-defined]
+    alarm_module.AlarmControlPanelState = AlarmControlPanelState  # type: ignore[attr-defined]
+    sys.modules["homeassistant.components.alarm_control_panel"] = alarm_module
+
+    alarm_const_module = types.ModuleType(
+        "homeassistant.components.alarm_control_panel.const"
+    )
+
+    class CodeFormat(enum.Enum):
+        NUMBER = "number"
+        TEXT = "text"
+
+    alarm_const_module.CodeFormat = CodeFormat  # type: ignore[attr-defined]
+    sys.modules["homeassistant.components.alarm_control_panel.const"] = (
+        alarm_const_module
+    )
 
     # homeassistant.helpers.selector
     selector_module = types.ModuleType("homeassistant.helpers.selector")
@@ -141,13 +180,28 @@ def pytest_configure() -> None:
         async def async_add_executor_job(self, func: Callable[..., Any], *args: Any) -> Any:
             return func(*args)
 
+    class CoordinatorEntity(Generic[_T]):  # pragma: no cover - behaviour mocked
+        def __init__(self, coordinator: DataUpdateCoordinator[_T]) -> None:
+            self.coordinator = coordinator
+
     class UpdateFailed(Exception):
         pass
 
     update_coordinator_module.DataUpdateCoordinator = DataUpdateCoordinator  # type: ignore[attr-defined]
+    update_coordinator_module.CoordinatorEntity = CoordinatorEntity  # type: ignore[attr-defined]
     update_coordinator_module.UpdateFailed = UpdateFailed  # type: ignore[attr-defined]
     sys.modules["homeassistant.helpers.update_coordinator"] = update_coordinator_module
     helpers_module.update_coordinator = update_coordinator_module  # type: ignore[attr-defined]
+
+    entity_module = types.ModuleType("homeassistant.helpers.entity")
+
+    class DeviceInfo(dict):  # pragma: no cover - helper for typing only
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+
+    entity_module.DeviceInfo = DeviceInfo  # type: ignore[attr-defined]
+    sys.modules["homeassistant.helpers.entity"] = entity_module
+    helpers_module.entity = entity_module  # type: ignore[attr-defined]
 
     typing_module = types.ModuleType("homeassistant.helpers.typing")
     typing_module.ConfigType = dict  # type: ignore[attr-defined]
@@ -206,6 +260,14 @@ def pytest_configure() -> None:
     pymodbus_module.client = pymodbus_client_module  # type: ignore[attr-defined]
     pymodbus_module.exceptions = pymodbus_exceptions_module  # type: ignore[attr-defined]
     sys.modules["pymodbus"] = pymodbus_module
+
+    exceptions_module = types.ModuleType("homeassistant.exceptions")
+
+    class HomeAssistantError(Exception):
+        """Generic Home Assistant exception placeholder."""
+
+    exceptions_module.HomeAssistantError = HomeAssistantError  # type: ignore[attr-defined]
+    sys.modules["homeassistant.exceptions"] = exceptions_module
 
     # voluptuous
     voluptuous_module = types.ModuleType("voluptuous")

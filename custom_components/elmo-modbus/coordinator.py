@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
@@ -11,7 +12,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
-from .const import DEFAULT_SCAN_INTERVAL, DEFAULT_SECTORS, REGISTER_STATUS_START
+from .const import (
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SECTORS,
+    REGISTER_ALARM_START,
+    REGISTER_STATUS_START,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -49,7 +55,15 @@ def _prepare_address_groups(
     return ordered, tuple(groups)
 
 
-class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
+@dataclass(frozen=True)
+class ElmoPanelStatus:
+    """Structured representation of the panel arming and alarm status."""
+
+    armed: tuple[bool, ...]
+    triggered: tuple[bool, ...]
+
+
+class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoPanelStatus]):
     """Coordinator responsible for polling the Modbus control panel."""
 
     def __init__(
@@ -70,16 +84,15 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
         )
         self._client = client
 
-    async def _async_update_data(self) -> list[bool]:
-        """Poll the Modbus device for the per-sector arming status bits."""
+    async def _async_update_data(self) -> ElmoPanelStatus:
+        """Poll the Modbus device for arming and alarm status bits."""
 
-        def _read_status() -> list[bool]:
-            """Synchronously read the discrete inputs from the device."""
+        def _read_span(start: int) -> tuple[bool, ...]:
+            """Synchronously read a span of discrete inputs from the device."""
+
             _ensure_client_connected(self._client)
 
-            response = self._client.read_discrete_inputs(
-                REGISTER_STATUS_START, count=self._sector_count
-            )
+            response = self._client.read_discrete_inputs(start, count=self._sector_count)
             if not response or getattr(response, "isError", lambda: True)():
                 raise ConnectionException("Invalid response when reading register")
 
@@ -87,7 +100,13 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[list[bool]]):
             # The pymodbus response may include more bits than requested when the
             # count isn't a multiple of eight. Trim the list to the exact span we
             # asked for to avoid leaking stale states.
-            return bits[: self._sector_count]
+            trimmed = bits[: self._sector_count]
+            return tuple(bool(bit) for bit in trimmed)
+
+        def _read_status() -> ElmoPanelStatus:
+            armed_bits = _read_span(REGISTER_STATUS_START)
+            triggered_bits = _read_span(REGISTER_ALARM_START)
+            return ElmoPanelStatus(armed=armed_bits, triggered=triggered_bits)
 
         try:
             return await self.hass.async_add_executor_job(_read_status)
