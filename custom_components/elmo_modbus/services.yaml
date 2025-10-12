@@ -1,11 +1,15 @@
 set_input_exclusion:
   name: Set input exclusion
   description: Includi/escludi ingressi sensore del sistema Elmo Modbus.
-  target:
-    entity:
-      domain: alarm_control_panel
-      integration: elmo_modbus
   fields:
+    entity_id:
+      name: Alarm panel (opzionale)
+      description: Seleziona un pannello Elmo Modbus (opzionale).
+      required: false
+      selector:
+        entity:
+          domain: alarm_control_panel
+          integration: elmo_modbus
     inputs:
       name: Inputs
       description: Selezione (es. "1-4,7,10-12") o lista di numeri.
