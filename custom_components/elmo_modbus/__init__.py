@@ -22,7 +22,6 @@ from .const import (
     PLATFORMS,
 )
 from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
-from .services import async_setup_services, async_unload_services
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -57,7 +56,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
     }
 
-    await async_setup_services(hass)
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -73,16 +71,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry_data: dict[str, Any] = hass.data[DOMAIN].pop(entry.entry_id)
         coordinator: ElmoModbusCoordinator = entry_data["coordinator"]
         await coordinator.async_close()
-
-        remaining_entries = [
-            key
-            for key, value in hass.data[DOMAIN].items()
-            if isinstance(value, dict)
-            and "inventory" in value
-            and "coordinator" in value
-        ]
-        if not remaining_entries:
-            await async_unload_services(hass)
 
     return unload_ok
 

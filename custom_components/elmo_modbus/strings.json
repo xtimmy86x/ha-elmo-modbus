@@ -292,6 +292,10 @@
                "name":"Device",
                "description":"Limit the service call to the device that represents the Elmo Modbus panel in Home Assistant."
             },
+            "entity_id":{
+               "name":"Alarm control panel",
+               "description":"Optional Elmo Modbus alarm control panel entity to target."
+            },
             "inputs":{
                "name":"Inputs",
                "description":"One or more input numbers (1-1024) to change the exclusion state for."

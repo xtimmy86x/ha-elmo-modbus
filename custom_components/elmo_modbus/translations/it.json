@@ -286,7 +286,11 @@
          "fields":{
             "config_entry_id":{
                "name":"ID configurazione",
-               "description":"Voce di configurazione da usare quando sono presenti più centrali." 
+               "description":"Voce di configurazione da usare quando sono presenti più centrali."
+            },
+            "entity_id":{
+               "name":"Centrale di allarme",
+               "description":"Facoltativo: seleziona la centrale Elmo Modbus su cui applicare il servizio."
             },
             "device_id":{
                "name":"Dispositivo",
