@@ -3,11 +3,32 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Protocol, TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant
+
+if TYPE_CHECKING:
+    from homeassistant.core import ServiceCall
+else:  # pragma: no cover - runtime fallback for test stubs
+    try:
+        from homeassistant.core import ServiceCall
+    except ImportError:
+        try:
+            from homeassistant.helpers.typing import ServiceCall  # type: ignore[attr-defined]
+        except (ImportError, AttributeError):
+
+            class ServiceCall(Protocol):  # type: ignore[misc, assignment]
+                """Fallback ServiceCall protocol used in tests."""
+
+                data: dict[str, Any]
+
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
+
+try:  # pragma: no cover - optional dependency for unit tests
+    from homeassistant.helpers import device_registry as dr
+except ImportError:  # pragma: no cover - provided by Home Assistant at runtime
+    dr = None  # type: ignore[assignment]
+
 import voluptuous as vol
 
 import logging
@@ -90,14 +111,35 @@ def _coerce_optional_str(value: Any) -> str | None:
     return text
 
 
-_SERVICE_SCHEMA = vol.Schema(
-    {
-        vol.Required(ATTR_INPUTS): _validate_inputs,
-        vol.Optional(ATTR_EXCLUDED, default=True): _coerce_bool,
-        vol.Optional(ATTR_CONFIG_ENTRY_ID, default=None): _coerce_optional_str,
-        vol.Optional(ATTR_DEVICE_ID, default=None): _coerce_optional_str,
-    }
-)
+if hasattr(vol, "Optional"):
+    _SERVICE_SCHEMA = vol.Schema(
+        {
+            vol.Required(ATTR_INPUTS): _validate_inputs,
+            vol.Optional(ATTR_EXCLUDED, default=True): _coerce_bool,
+            vol.Optional(ATTR_CONFIG_ENTRY_ID, default=None): _coerce_optional_str,
+            vol.Optional(ATTR_DEVICE_ID, default=None): _coerce_optional_str,
+        }
+    )
+else:  # pragma: no cover - executed only by unit test stubs
+
+    def _SERVICE_SCHEMA(data: dict[str, Any]) -> dict[str, Any]:
+        """Fallback schema validator when voluptuous optional is unavailable."""
+
+        if ATTR_INPUTS not in data:
+            raise vol.Invalid(f"missing required key: {ATTR_INPUTS}")
+
+        validated: dict[str, Any] = {}
+        validated[ATTR_INPUTS] = _validate_inputs(data[ATTR_INPUTS])
+        validated[ATTR_EXCLUDED] = _coerce_bool(data.get(ATTR_EXCLUDED, True))
+        validated[ATTR_CONFIG_ENTRY_ID] = _coerce_optional_str(
+            data.get(ATTR_CONFIG_ENTRY_ID)
+        )
+        validated[ATTR_DEVICE_ID] = _coerce_optional_str(data.get(ATTR_DEVICE_ID))
+
+        for key, value in data.items():
+            validated.setdefault(key, value)
+
+        return validated
 
 
 def _active_entries(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
@@ -132,6 +174,8 @@ def _resolve_entry_ids(
         result.add(config_entry_id)
 
     if device_id:
+        if dr is None:
+            raise HomeAssistantError("Device registry is not available.")
         registry = dr.async_get(hass)
         device = registry.async_get(device_id)
         if device is None:

@@ -49,7 +49,8 @@ A polished Home Assistant integration for supervising and controlling Elmo alarm
 
 1### HACS (recommended)
 
-1. Add this repository (`https://github.com/ha-elmo-modbus/ha-elmo-modbus`) as a **custom repository** in HACS (Category: *Integration*).
+1. Add this repository (`https://github.com/xtimmy86x/ha-elmo-modbus`) 
+   as a **custom repository** in HACS (Category: *Integration*).
 2. Install **Elmo Modbus** from the *Integrations* tab.
 3. Restart Home Assistant when prompted to load the new integration module.
 
