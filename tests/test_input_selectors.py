@@ -1,4 +1,4 @@
-"""Tests for ``custom_components.elmo-modbus.input_selectors``."""
+"""Tests for ``custom_components.elmo_modbus.input_selectors``."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import importlib
 import pytest
 
 input_selectors = importlib.import_module(
-    "custom_components.elmo-modbus.input_selectors"
+    "custom_components.elmo_modbus.input_selectors"
 )
 
 

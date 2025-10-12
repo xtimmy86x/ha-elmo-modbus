@@ -1,0 +1,28 @@
+set_input_exclusion:
+  name: Set input exclusion
+  description: Includi/escludi ingressi sensore del sistema Elmo Modbus.
+  fields:
+    inputs:
+      name: Inputs
+      description: Selezione (es. "1-4,7,10-12") o lista di numeri.
+      required: true
+      example: "1-4,7,10-12"
+      selector:
+        text:
+    excluded:
+      name: Escludi
+      description: true = escludi, false = attiva
+      default: true
+      selector:
+        boolean:
+    config_entry_id:
+      name: Config entry id
+      required: false
+      selector:
+        text:
+    device_id:
+      name: Device
+      required: false
+      selector:
+        device:
+          integration: elmo_modbus

@@ -56,7 +56,7 @@ A polished Home Assistant integration for supervising and controlling Elmo alarm
 ### Manual installation
 
 1. Download the latest release archive from GitHub.
-2. Copy the `custom_components/elmo-modbus` folder into your Home Assistant configuration directory.
+2. Copy the `custom_components/elmo_modbus` folder into your Home Assistant configuration directory.
 3. Restart Home Assistant to register the integration.
 
 ## Configuration

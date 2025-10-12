@@ -1,6 +1,6 @@
 """Constants for the Elmo Modbus integration."""
 
-DOMAIN = "elmo-modbus"
+DOMAIN = "elmo_modbus"
 PLATFORMS = ["alarm_control_panel", "binary_sensor", "sensor", "switch"]
 DEFAULT_SCAN_INTERVAL = 1  # in seconds
 DEFAULT_NAME = "Elmo Modbus"
@@ -27,4 +27,5 @@ REGISTER_COMMAND_START = 12289
 INPUT_SENSOR_START = 4097
 INPUT_SENSOR_EXCLUDED_START = 8193
 OUTPUT_SWITCH_START = 20481
+INPUT_EXCLUDE_START = 8193
 INOUT_MAX_COUNT = 1024

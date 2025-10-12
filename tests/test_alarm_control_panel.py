@@ -5,8 +5,8 @@ from __future__ import annotations
 import importlib
 from types import SimpleNamespace
 
-alarm_panel = importlib.import_module("custom_components.elmo-modbus.alarm_control_panel")
-coordinator = importlib.import_module("custom_components.elmo-modbus.coordinator")
+alarm_panel = importlib.import_module("custom_components.elmo_modbus.alarm_control_panel")
+coordinator = importlib.import_module("custom_components.elmo_modbus.coordinator")
 
 ElmoModbusAlarmControlPanel = alarm_panel.ElmoModbusAlarmControlPanel
 ElmoInventorySnapshot = coordinator.ElmoInventorySnapshot

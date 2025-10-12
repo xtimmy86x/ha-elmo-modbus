@@ -278,5 +278,29 @@
             "name":"Temperatura centrale"
          }
       }
+   },
+   "services":{
+      "set_input_exclusion":{
+         "name":"Imposta esclusione ingressi",
+         "description":"Escludi o riattiva gli ingressi di allarme scrivendo sulla coil Modbus.",
+         "fields":{
+            "config_entry_id":{
+               "name":"ID configurazione",
+               "description":"Voce di configurazione da usare quando sono presenti più centrali." 
+            },
+            "device_id":{
+               "name":"Dispositivo",
+               "description":"Limita il servizio al dispositivo che rappresenta la centrale Elmo Modbus in Home Assistant."
+            },
+            "inputs":{
+               "name":"Ingressi",
+               "description":"Uno o più numeri di ingresso (1-1024) da cui modificare lo stato di esclusione."
+            },
+            "excluded":{
+               "name":"Escluso",
+               "description":"Imposta true per escludere gli ingressi, false per riattivarli."
+            }
+         }
+      }
    }
 }

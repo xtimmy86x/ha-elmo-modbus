@@ -7,6 +7,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
+import logging
+_LOGGER = logging.getLogger(__name__)
+
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.client import ModbusTcpClient
@@ -29,7 +32,6 @@ def _ensure_client_connected(client: ModbusTcpClient) -> None:
         return
     if not client.connect():
         raise ConnectionException("Unable to connect to Modbus device")
-
 
 def _prepare_address_groups(
     addresses: Iterable[int],

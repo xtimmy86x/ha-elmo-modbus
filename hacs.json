@@ -1,8 +1,8 @@
 {
   "name": "Elmo Modbus",
   "content_in_root": false,
-  "domain": "elmo-modbus",
-  "filename": "custom_components/elmo-modbus/manifest.json",
+  "domain": "elmo_modbus",
+  "filename": "custom_components/elmo_modbus/manifest.json",
   "homeassistant": "2023.8.0",
   "render_readme": true
 }

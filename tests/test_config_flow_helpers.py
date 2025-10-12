@@ -7,7 +7,7 @@ import importlib
 import pytest
 import voluptuous as vol
 
-config_flow = importlib.import_module("custom_components.elmo-modbus.config_flow")
+config_flow = importlib.import_module("custom_components.elmo_modbus.config_flow")
 
 
 def test_format_with_number_placeholder() -> None:

@@ -6,8 +6,8 @@ import importlib
 
 import pytest
 
-panels = importlib.import_module("custom_components.elmo-modbus.panels")
-const = importlib.import_module("custom_components.elmo-modbus.const")
+panels = importlib.import_module("custom_components.elmo_modbus.panels")
+const = importlib.import_module("custom_components.elmo_modbus.const")
 
 
 def test_sanitize_sectors_filters_values() -> None:

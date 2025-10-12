@@ -1,5 +1,5 @@
 {
-  "domain": "elmo-modbus",
+  "domain": "elmo_modbus",
   "name": "Elmo Modbus",
   "codeowners": ["@xtimmy86x"],
   "config_flow": true,
