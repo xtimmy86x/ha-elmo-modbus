@@ -23,6 +23,7 @@ from .const import (
     CONF_INPUT_SENSORS,
     DOMAIN,
     INOUT_MAX_COUNT,
+    INPUT_SENSOR_EXCLUDED_START,
     INPUT_SENSOR_START,
     OPTION_INPUT_NAMES,
 )
@@ -36,6 +37,7 @@ class ElmoBinarySensorDescription(BinarySensorEntityDescription):
 
     address: int
     object_id: str | None = None
+    excluded_address: int | None = None
 
 
 BASE_SENSOR_DESCRIPTIONS: tuple[ElmoBinarySensorDescription, ...] = (
@@ -192,6 +194,7 @@ async def async_setup_entry(
             "key": f"alarm_input_{index}",
             "address": INPUT_SENSOR_START + index - 1,
             "device_class": BinarySensorDeviceClass.SAFETY,
+            "excluded_address": INPUT_SENSOR_EXCLUDED_START + index - 1,
         }
 
         if custom_name:
@@ -216,7 +219,13 @@ async def async_setup_entry(
         input_descriptions.append(ElmoBinarySensorDescription(**description_kwargs))
 
     descriptions = [*BASE_SENSOR_DESCRIPTIONS, *input_descriptions]
-    addresses = tuple(description.address for description in descriptions)
+    address_set: set[int] = set()
+    for description in descriptions:
+        address_set.add(description.address)
+        if description.excluded_address is not None:
+            address_set.add(description.excluded_address)
+
+    addresses = tuple(sorted(address_set))
 
     entity_registry = er.async_get(hass)
     for description in input_descriptions:
@@ -291,3 +300,24 @@ class ElmoModbusBinarySensor(CoordinatorEntity[ElmoModbusCoordinator], BinarySen
             manufacturer="Elmo",
             name="Elmo Modbus Control Panel",
         )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Return additional state attributes for the binary sensor."""
+        snapshot = self.coordinator.data
+        if not snapshot:
+            return None
+
+        attrs: dict[str, str] = {}
+
+        excluded_addr = self.entity_description.excluded_address
+        if excluded_addr is None:
+            return attrs  # nessun attributo "excluded" per questo sensore
+
+        excluded_value = snapshot.discrete_inputs.get(excluded_addr)
+        if excluded_value is None:
+            # il coordinatore non ha (ancora) il valore: non esporre l'attributo
+            return attrs
+
+        attrs["excluded"] = "on" if bool(excluded_value) else "off"
+        return attrs
