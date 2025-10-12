@@ -6,7 +6,7 @@ import enum
 import pathlib
 import sys
 import types
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, Iterable, TypeVar
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -41,8 +41,16 @@ def pytest_configure() -> None:
     class HomeAssistant:  # pragma: no cover - helper for typing in tests
         """Minimal HomeAssistant placeholder."""
 
+        def __init__(self) -> None:
+            self.data: dict[str, Any] = {}
+
         class config:  # type: ignore[valid-type]
             language = "en"
+
+        async def async_add_executor_job(
+            self, func: Callable[..., Any], *args: Any
+        ) -> Any:
+            return func(*args)
 
     def callback(func: Callable[..., Any]) -> Callable[..., Any]:
         """Return the wrapped callback unchanged."""
@@ -154,8 +162,68 @@ def pytest_configure() -> None:
     config_validation_module.config_entry_only_config_schema = (
         config_entry_only_config_schema  # type: ignore[attr-defined]
     )
+
+    def entity_ids(value: Any) -> list[str]:
+        if isinstance(value, str):
+            candidates = [value]
+        elif isinstance(value, Iterable):
+            candidates = list(value)
+        else:
+            raise ValueError
+
+        result: list[str] = []
+        for candidate in candidates:
+            text = str(candidate or "").strip().lower()
+            if not text or "." not in text:
+                raise ValueError
+            result.append(text)
+
+        if not result:
+            raise ValueError
+
+        return result
+
+    config_validation_module.entity_ids = entity_ids  # type: ignore[attr-defined]
     sys.modules["homeassistant.helpers.config_validation"] = config_validation_module
     helpers_module.config_validation = config_validation_module  # type: ignore[attr-defined]
+
+    entity_registry_module = types.ModuleType(
+        "homeassistant.helpers.entity_registry"
+    )
+
+    class RegistryEntry:  # pragma: no cover - helper for service tests
+        def __init__(
+            self,
+            *,
+            entity_id: str,
+            unique_id: str,
+            platform: str | None = None,
+            config_entry_id: str | None = None,
+        ) -> None:
+            self.entity_id = entity_id
+            self.unique_id = unique_id
+            self.platform = platform
+            self.config_entry_id = config_entry_id
+
+    class EntityRegistry:  # pragma: no cover - helper for service tests
+        def __init__(self) -> None:
+            self.entities: dict[str, RegistryEntry] = {}
+
+        def async_get(self, entity_id: str) -> RegistryEntry | None:
+            return self.entities.get(entity_id)
+
+    def async_get(hass: Any) -> EntityRegistry:
+        registry = getattr(hass, "_entity_registry", None)
+        if registry is None:
+            registry = EntityRegistry()
+            setattr(hass, "_entity_registry", registry)
+        return registry
+
+    entity_registry_module.RegistryEntry = RegistryEntry  # type: ignore[attr-defined]
+    entity_registry_module.EntityRegistry = EntityRegistry  # type: ignore[attr-defined]
+    entity_registry_module.async_get = async_get  # type: ignore[attr-defined]
+    sys.modules["homeassistant.helpers.entity_registry"] = entity_registry_module
+    helpers_module.entity_registry = entity_registry_module  # type: ignore[attr-defined]
 
     # homeassistant.helpers.translation
     translation_module = types.ModuleType("homeassistant.helpers.translation")

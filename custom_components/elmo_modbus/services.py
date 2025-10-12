@@ -29,6 +29,16 @@ try:  # pragma: no cover - optional dependency for unit tests
 except ImportError:  # pragma: no cover - provided by Home Assistant at runtime
     dr = None  # type: ignore[assignment]
 
+try:  # pragma: no cover - provided by Home Assistant at runtime
+    from homeassistant.helpers import config_validation as cv
+except ImportError:  # pragma: no cover - used in unit test environment
+    cv = None  # type: ignore[assignment]
+
+try:  # pragma: no cover - provided by Home Assistant at runtime
+    from homeassistant.helpers import entity_registry as er
+except ImportError:  # pragma: no cover - used in unit test environment
+    er = None  # type: ignore[assignment]
+
 import voluptuous as vol
 
 import logging
@@ -45,6 +55,7 @@ ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_DEVICE_ID = "device_id"
 ATTR_EXCLUDED = "excluded"
 ATTR_INPUTS = "inputs"
+ATTR_INPUT_ENTITIES = "input_entities"
 SERVICES_KEY = "_services"
 _REGISTERED = "registered"
 
@@ -110,26 +121,99 @@ def _coerce_optional_str(value: Any) -> str | None:
         return None
     return text
 
+def _normalize_entity_ids(value: Any) -> list[str]:
+    """Validate and normalise a collection of entity identifiers."""
+
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        candidates = list(value)
+    else:
+        raise vol.Invalid("invalid_entity_id")
+
+    entity_ids: list[str] = []
+    for candidate in candidates:
+        text = str(candidate or "").strip().lower()
+        if not text or "." not in text:
+            raise vol.Invalid("invalid_entity_id")
+        entity_ids.append(text)
+
+    if not entity_ids:
+        raise vol.Invalid("invalid_entity_id")
+
+    return entity_ids
+
+
+def _ensure_inputs_specified(data: dict[str, Any]) -> dict[str, Any]:
+    """Ensure that either numeric inputs or input entities were provided."""
+
+    inputs = data.get(ATTR_INPUTS)
+    if inputs:
+        return data
+
+    entities = data.get(ATTR_INPUT_ENTITIES)
+    if entities:
+        return data
+
+    target_entities = data.get("entity_id")
+    if target_entities:
+        for entity_id in target_entities:
+            if str(entity_id).split(".")[0] == "binary_sensor":
+                return data
+
+    raise vol.Invalid(f"missing required key: {ATTR_INPUTS}")
 
 if hasattr(vol, "Optional"):
-    _SERVICE_SCHEMA = vol.Schema(
-        {
-            vol.Required(ATTR_INPUTS): _validate_inputs,
-            vol.Optional(ATTR_EXCLUDED, default=True): _coerce_bool,
-            vol.Optional(ATTR_CONFIG_ENTRY_ID, default=None): _coerce_optional_str,
-            vol.Optional(ATTR_DEVICE_ID, default=None): _coerce_optional_str,
-        }
+    _entity_ids_validator = (
+        vol.All(cv.entity_ids, vol.Length(min=1)) if cv else vol.All(_normalize_entity_ids, vol.Length(min=1))
     )
+
+    _SERVICE_SCHEMA = vol.All(
+        vol.Schema(
+            {
+                vol.Optional(ATTR_INPUTS): _validate_inputs,
+                vol.Optional(ATTR_INPUT_ENTITIES): _entity_ids_validator,
+                vol.Optional(ATTR_EXCLUDED, default=True): _coerce_bool,
+                vol.Optional(ATTR_CONFIG_ENTRY_ID, default=None): _coerce_optional_str,
+                vol.Optional(ATTR_DEVICE_ID, default=None): _coerce_optional_str,
+                vol.Optional("entity_id"): _entity_ids_validator,
+            },
+            extra=vol.ALLOW_EXTRA,
+        ),
+        _ensure_inputs_specified,
+    )
+
 else:  # pragma: no cover - executed only by unit test stubs
 
     def _SERVICE_SCHEMA(data: dict[str, Any]) -> dict[str, Any]:
         """Fallback schema validator when voluptuous optional is unavailable."""
 
-        if ATTR_INPUTS not in data:
-            raise vol.Invalid(f"missing required key: {ATTR_INPUTS}")
-
         validated: dict[str, Any] = {}
-        validated[ATTR_INPUTS] = _validate_inputs(data[ATTR_INPUTS])
+        inputs: list[int] | None = None
+        if ATTR_INPUTS in data and data[ATTR_INPUTS] not in (None, ""):
+            inputs = _validate_inputs(data[ATTR_INPUTS])
+            validated[ATTR_INPUTS] = inputs
+
+        if ATTR_INPUT_ENTITIES in data and data[ATTR_INPUT_ENTITIES] not in (None, ""):
+            entities = _normalize_entity_ids(data[ATTR_INPUT_ENTITIES])
+            validated[ATTR_INPUT_ENTITIES] = entities
+        else:
+            entities = None
+
+        target_entities: list[str] | None = None
+        if "entity_id" in data and data["entity_id"] not in (None, ""):
+            target_entities = _normalize_entity_ids(data["entity_id"])
+            validated["entity_id"] = target_entities
+
+        if not inputs and not entities:
+            binary_targets = [
+                entity_id
+                for entity_id in target_entities or []
+                if entity_id.split(".")[0] == "binary_sensor"
+            ]
+            if not binary_targets:
+                raise vol.Invalid(f"missing required key: {ATTR_INPUTS}")
+
         validated[ATTR_EXCLUDED] = _coerce_bool(data.get(ATTR_EXCLUDED, True))
         validated[ATTR_CONFIG_ENTRY_ID] = _coerce_optional_str(
             data.get(ATTR_CONFIG_ENTRY_ID)
@@ -156,7 +240,11 @@ def _active_entries(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
 
 
 def _resolve_entry_ids(
-    hass: HomeAssistant, *, config_entry_id: str | None, device_id: str | None
+    hass: HomeAssistant,
+    *,
+    config_entry_id: str | None,
+    device_id: str | None,
+    entity_ids: Iterable[str] | None = None,
 ) -> list[str]:
     """Determine which config entries should receive the service call."""
 
@@ -190,6 +278,24 @@ def _resolve_entry_ids(
                 "Device does not belong to an Elmo Modbus config entry."
             )
 
+    if entity_ids:
+        if er is None:
+            raise HomeAssistantError("Entity registry is not available.")
+        registry = er.async_get(hass)
+        for entity_id in entity_ids:
+            entry = registry.async_get(entity_id)
+            if entry is None:
+                raise HomeAssistantError(
+                    f"Entity {entity_id} not found in entity registry."
+                )
+            platform = getattr(entry, "platform", None)
+            config_id = getattr(entry, "config_entry_id", None)
+            if platform != DOMAIN or config_id not in entries:
+                raise HomeAssistantError(
+                    "Entity does not belong to an Elmo Modbus config entry."
+                )
+            result.add(config_id)
+
     if result:
         return sorted(result)
 
@@ -200,28 +306,121 @@ def _resolve_entry_ids(
         "Multiple Elmo Modbus entries configured; specify config_entry_id or device_id."
     )
 
+def _group_input_entities_by_entry(
+    hass: HomeAssistant, entity_ids: Iterable[str]
+) -> dict[str, set[int]]:
+    """Return mapping of config entry IDs to input indices from entity ids."""
+
+    identifiers = list(dict.fromkeys(entity_ids))
+    if not identifiers:
+        return {}
+
+    if er is None:
+        raise HomeAssistantError("Entity registry is not available.")
+
+    entries = _active_entries(hass)
+    registry = er.async_get(hass)
+    mapping: dict[str, set[int]] = {}
+
+    for entity_id in identifiers:
+        entry = registry.async_get(entity_id)
+        if entry is None:
+            raise HomeAssistantError(
+                f"Entity {entity_id} not found in entity registry."
+            )
+
+        platform = getattr(entry, "platform", None)
+        if platform != DOMAIN:
+            raise HomeAssistantError(
+                "Entity does not belong to the Elmo Modbus integration."
+            )
+
+        domain = entity_id.split(".")[0]
+        if domain != "binary_sensor":
+            raise HomeAssistantError("Entity is not an Elmo Modbus alarm input.")
+
+        unique_id = str(getattr(entry, "unique_id", "") or "")
+        prefix, marker, suffix = unique_id.partition(":binary:alarm_input_")
+        if marker != ":binary:alarm_input_":
+            raise HomeAssistantError("Entity is not an Elmo Modbus alarm input.")
+
+        try:
+            input_index = int(suffix)
+        except (TypeError, ValueError) as err:
+            raise HomeAssistantError("Entity is not an Elmo Modbus alarm input.") from err
+
+        if input_index < 1 or input_index > INOUT_MAX_COUNT:
+            raise HomeAssistantError("Entity input index is out of range.")
+
+        config_entry_id = getattr(entry, "config_entry_id", None)
+        if config_entry_id is None or config_entry_id not in entries:
+            raise HomeAssistantError(
+                "Entity does not belong to a loaded Elmo Modbus config entry."
+            )
+
+        mapping.setdefault(config_entry_id, set()).add(input_index)
+
+    return mapping
 
 async def _async_handle_set_input_exclusion(
     hass: HomeAssistant, call: ServiceCall
 ) -> None:
     """Handle the set_input_exclusion service call."""
 
-    inputs: list[int] = call.data[ATTR_INPUTS]
+    inputs: list[int] = call.data.get(ATTR_INPUTS) or []
     excluded: bool = call.data[ATTR_EXCLUDED]
     config_entry_id: str | None = call.data.get(ATTR_CONFIG_ENTRY_ID)
     device_id: str | None = call.data.get(ATTR_DEVICE_ID)
 
+    raw_input_entities = call.data.get(ATTR_INPUT_ENTITIES)
+    if isinstance(raw_input_entities, str):
+        input_entities = [raw_input_entities]
+    elif isinstance(raw_input_entities, Iterable):
+        input_entities = [str(entity) for entity in raw_input_entities]
+    else:
+        input_entities = []
+
+    raw_target_entity_ids = call.data.get("entity_id")
+    if isinstance(raw_target_entity_ids, str):
+        target_entity_ids = [raw_target_entity_ids]
+    elif isinstance(raw_target_entity_ids, Iterable):
+        target_entity_ids = [str(entity) for entity in raw_target_entity_ids]
+    else:
+        target_entity_ids = []
+
+    combined_entity_ids = list(dict.fromkeys([*target_entity_ids, *input_entities]))
+
     entry_ids = _resolve_entry_ids(
-        hass, config_entry_id=config_entry_id, device_id=device_id
+        hass,
+        config_entry_id=config_entry_id,
+        device_id=device_id,
+        entity_ids=combined_entity_ids or None,
     )
 
-    addresses = [INPUT_SENSOR_EXCLUDED_START + index - 1 for index in inputs]
+    additional_input_entities = [
+        entity_id for entity_id in target_entity_ids if entity_id.startswith("binary_sensor.")
+    ]
+    entity_inputs = _group_input_entities_by_entry(
+        hass, [*input_entities, *additional_input_entities]
+    )
+
     desired_value = not excluded  # False => exclude, True => activate
 
     for entry_id in entry_ids:
         entry_data = hass.data[DOMAIN][entry_id]
         inventory: ElmoModbusInventory = entry_data["inventory"]
         coordinator: ElmoModbusCoordinator = entry_data["coordinator"]
+
+        selected_inputs = set(inputs)
+        selected_inputs.update(entity_inputs.get(entry_id, set()))
+        if not selected_inputs:
+            raise HomeAssistantError(
+                "No inputs were provided for the selected config entry."
+            )
+
+        addresses = [
+            INPUT_SENSOR_EXCLUDED_START + index - 1 for index in sorted(selected_inputs)
+        ]
 
         def _write() -> None:
             for address in addresses:

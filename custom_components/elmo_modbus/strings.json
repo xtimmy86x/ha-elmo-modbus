@@ -296,6 +296,10 @@
                "name":"Inputs",
                "description":"One or more input numbers (1-1024) to change the exclusion state for."
             },
+            "input_entities":{
+               "name":"Input entities",
+               "description":"Select one or more Elmo Modbus input sensors to change the exclusion state for."
+            },
             "excluded":{
                "name":"Excluded",
                "description":"Set to true to exclude the inputs, false to reactivate them."

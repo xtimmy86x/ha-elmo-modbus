@@ -296,6 +296,10 @@
                "name":"Ingressi",
                "description":"Uno o più numeri di ingresso (1-1024) da cui modificare lo stato di esclusione."
             },
+            "input_entities":{
+               "name":"Sensori di ingresso",
+               "description":"Seleziona uno o più sensori di ingresso Elmo Modbus per modificare lo stato di esclusione."
+            },
             "excluded":{
                "name":"Escluso",
                "description":"Imposta true per escludere gli ingressi, false per riattivarli."
