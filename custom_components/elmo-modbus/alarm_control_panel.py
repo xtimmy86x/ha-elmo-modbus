@@ -252,6 +252,9 @@ class ElmoModbusAlarmControlPanel(
         status = snapshot.status
         armed_bits = status.armed
         triggered_bits = status.triggered
+        
+        # read current status of general alarm input
+        general_alarm = snapshot.discrete_inputs.get(0x0200)
 
         # settori armati globali (1-based)
         armed_sectors_all = {i + 1 for i, b in enumerate(armed_bits) if bool(b)}
@@ -269,7 +272,7 @@ class ElmoModbusAlarmControlPanel(
 
         panel_armed_count = len(panel_armed_sectors)
 
-        if panel_triggered_sectors:
+        if panel_triggered_sectors and general_alarm:
             return AlarmControlPanelState.TRIGGERED
 
         # SE tutti i settori gestiti dal pannello sono disarmati -> DISARMED
