@@ -280,33 +280,39 @@
       }
    },
    "services":{
-      "set_input_exclusion":{
-         "name":"Imposta esclusione ingressi",
-         "description":"Escludi o riattiva gli ingressi di allarme scrivendo sulla coil Modbus.",
+      "exclude_inputs":{
+         "name":"Escludi ingressi",
+         "description":"Esclude gli ingressi dell'allarme impostando a 0 la bobina Modbus.",
          "fields":{
-            "config_entry_id":{
-               "name":"ID configurazione",
-               "description":"Voce di configurazione da usare quando sono presenti più centrali."
-            },
             "entity_id":{
                "name":"Centrale di allarme",
-               "description":"Facoltativo: seleziona la centrale Elmo Modbus su cui applicare il servizio."
-            },
-            "device_id":{
-               "name":"Dispositivo",
-               "description":"Limita il servizio al dispositivo che rappresenta la centrale Elmo Modbus in Home Assistant."
+               "description":"Entità della centrale Elmo Modbus da utilizzare quando si indicano numeri di ingresso."
             },
             "inputs":{
                "name":"Ingressi",
-               "description":"Uno o più numeri di ingresso (1-1024) da cui modificare lo stato di esclusione."
+               "description":"Numeri degli ingressi dell'allarme (1-1024) da aggiornare."
             },
             "input_entities":{
                "name":"Sensori di ingresso",
-               "description":"Seleziona uno o più sensori di ingresso Elmo Modbus per modificare lo stato di esclusione."
+               "description":"Sensori di ingresso Elmo Modbus da aggiornare."
+            }
+         }
+      },
+      "include_inputs":{
+         "name":"Includi ingressi",
+         "description":"Riattiva gli ingressi dell'allarme impostando a 1 la bobina Modbus.",
+         "fields":{
+            "entity_id":{
+               "name":"Centrale di allarme",
+               "description":"Entità della centrale Elmo Modbus da utilizzare quando si indicano numeri di ingresso."
             },
-            "excluded":{
-               "name":"Escluso",
-               "description":"Imposta true per escludere gli ingressi, false per riattivarli."
+            "inputs":{
+               "name":"Ingressi",
+               "description":"Numeri degli ingressi dell'allarme (1-1024) da aggiornare."
+            },
+            "input_entities":{
+               "name":"Sensori di ingresso",
+               "description":"Sensori di ingresso Elmo Modbus da aggiornare."
             }
          }
       }

@@ -280,33 +280,39 @@
       }
    },
    "services":{
-      "set_input_exclusion":{
-         "name":"Set input exclusion",
-         "description":"Exclude or reactivate alarm inputs by writing to the Modbus coil.",
+      "exclude_inputs":{
+         "name":"Exclude inputs",
+         "description":"Exclude alarm inputs by setting the Modbus coil to 0.",
          "fields":{
-            "config_entry_id":{
-               "name":"Config entry ID",
-               "description":"Optional specific config entry to target when multiple panels are configured."
-            },
-            "device_id":{
-               "name":"Device",
-               "description":"Limit the service call to the device that represents the Elmo Modbus panel in Home Assistant."
-            },
             "entity_id":{
                "name":"Alarm control panel",
-               "description":"Optional Elmo Modbus alarm control panel entity to target."
+               "description":"Optional Elmo Modbus alarm control panel entity used when specifying raw input numbers."
             },
             "inputs":{
                "name":"Inputs",
-               "description":"One or more input numbers (1-1024) to change the exclusion state for."
+               "description":"Alarm input numbers (1-1024) to update."
             },
             "input_entities":{
                "name":"Input entities",
-               "description":"Select one or more Elmo Modbus input sensors to change the exclusion state for."
+               "description":"Elmo Modbus alarm input sensors to update."
+            }
+         }
+      },
+      "include_inputs":{
+         "name":"Include inputs",
+         "description":"Reactivate alarm inputs by setting the Modbus coil to 1.",
+         "fields":{
+            "entity_id":{
+               "name":"Alarm control panel",
+               "description":"Optional Elmo Modbus alarm control panel entity used when specifying raw input numbers."
             },
-            "excluded":{
-               "name":"Excluded",
-               "description":"Set to true to exclude the inputs, false to reactivate them."
+            "inputs":{
+               "name":"Inputs",
+               "description":"Alarm input numbers (1-1024) to update."
+            },
+            "input_entities":{
+               "name":"Input entities",
+               "description":"Elmo Modbus alarm input sensors to update."
             }
          }
       }

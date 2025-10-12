@@ -13,6 +13,7 @@ from pymodbus.client import ModbusTcpClient
 import logging
 _LOGGER = logging.getLogger(__name__)
 
+from .services import async_setup_services, async_unload_services
 from .const import (
     CONF_SCAN_INTERVAL,
     CONF_SECTORS,
@@ -56,6 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
     }
 
+    await async_setup_services(hass)
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -71,6 +73,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry_data: dict[str, Any] = hass.data[DOMAIN].pop(entry.entry_id)
         coordinator: ElmoModbusCoordinator = entry_data["coordinator"]
         await coordinator.async_close()
+
+        await async_unload_services(hass)
 
     return unload_ok
 
