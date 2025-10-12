@@ -18,7 +18,7 @@ from .const import (
     DOMAIN,
     PLATFORMS,
 )
-from .coordinator import ElmoModbusCoordinator
+from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -37,17 +37,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     sector_count = entry.data.get(CONF_SECTORS, DEFAULT_SECTORS)
 
+    inventory = ElmoModbusInventory(client, sector_count=sector_count)
+    inventory.require_status()
+
     coordinator = ElmoModbusCoordinator(
         hass,
-        client,
-        sector_count=sector_count,
+        inventory,
         scan_interval=scan_interval,
     )
 
     await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
+        "inventory": inventory,
         "coordinator": coordinator,
     }
 
@@ -65,8 +67,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry_data: dict[str, Any] = hass.data[DOMAIN].pop(entry.entry_id)
         coordinator: ElmoModbusCoordinator = entry_data["coordinator"]
         await coordinator.async_close()
-        client: ModbusTcpClient = entry_data["client"]
-        await hass.async_add_executor_job(client.close)
 
     return unload_ok
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -63,33 +63,116 @@ class ElmoPanelStatus:
     triggered: tuple[bool, ...]
 
 
-class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoPanelStatus]):
-    """Coordinator responsible for polling the Modbus control panel."""
+@dataclass(frozen=True)
+class ElmoInventorySnapshot:
+    """Representation of the cached state held by the Modbus inventory."""
 
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        client: ModbusTcpClient,
-        *,
-        sector_count: int = DEFAULT_SECTORS,
-        scan_interval: int = DEFAULT_SCAN_INTERVAL,
-    ) -> None:
-        """Initialize the coordinator."""
-        self._sector_count = max(1, min(sector_count, DEFAULT_SECTORS))
-        super().__init__(
-            hass,
-            LOGGER,
-            name="Elmo Modbus status",
-            update_interval=timedelta(seconds=max(1, scan_interval)),
-        )
+    status: ElmoPanelStatus | None
+    discrete_inputs: dict[int, bool]
+    coils: dict[int, bool]
+    holding_registers: dict[int, int | None]
+
+
+class ElmoModbusInventory:
+    """Book-keeping of addresses polled from the Modbus device."""
+
+    def __init__(self, client: ModbusTcpClient, *, sector_count: int) -> None:
         self._client = client
+        self._sector_count = max(1, min(sector_count, DEFAULT_SECTORS))
+        self._status_required = False
+        self._discrete_inputs: set[int] = set()
+        self._coils: set[int] = set()
+        self._holding_registers: set[int] = set()
+        self._cached_status: ElmoPanelStatus | None = None
+        self._cached_inputs: dict[int, bool] = {}
+        self._cached_coils: dict[int, bool] = {}
+        self._cached_registers: dict[int, int | None] = {}
 
-    async def _async_update_data(self) -> ElmoPanelStatus:
-        """Poll the Modbus device for arming and alarm status bits."""
+    @property
+    def sector_count(self) -> int:
+        """Return the number of sectors managed by the inventory."""
+
+        return self._sector_count
+
+    def require_status(self) -> bool:
+        """Ensure the arming and alarm status registers are polled."""
+
+        if self._status_required:
+            return False
+        self._status_required = True
+        return True
+
+    def add_discrete_inputs(self, addresses: Iterable[int]) -> bool:
+        """Register additional discrete input addresses for polling."""
+
+        before = set(self._discrete_inputs)
+        for address in addresses:
+            try:
+                value = int(address)
+            except (TypeError, ValueError):
+                continue
+            self._discrete_inputs.add(value)
+        return before != self._discrete_inputs
+
+    def add_coils(self, addresses: Iterable[int]) -> bool:
+        """Register additional coil addresses for polling."""
+
+        before = set(self._coils)
+        for address in addresses:
+            try:
+                value = int(address)
+            except (TypeError, ValueError):
+                continue
+            self._coils.add(value)
+        return before != self._coils
+
+    def add_holding_registers(self, addresses: Iterable[int]) -> bool:
+        """Register additional holding register addresses for polling."""
+
+        before = set(self._holding_registers)
+        for address in addresses:
+            try:
+                value = int(address)
+            except (TypeError, ValueError):
+                continue
+            self._holding_registers.add(value)
+        return before != self._holding_registers
+
+    def refresh(self) -> ElmoInventorySnapshot:
+        """Poll the Modbus device for all registered addresses."""
+
+        status = self._cached_status
+        discrete_inputs = dict(self._cached_inputs)
+        coils = dict(self._cached_coils)
+        holding_registers = dict(self._cached_registers)
+
+        if self._status_required:
+            status = self._read_status()
+            self._cached_status = status
+
+        if self._discrete_inputs:
+            discrete_inputs = self._read_discrete_inputs()
+            self._cached_inputs = discrete_inputs
+
+        if self._coils:
+            coils = self._read_coils()
+            self._cached_coils = coils
+
+        if self._holding_registers:
+            holding_registers = self._read_holding_registers()
+            self._cached_registers = holding_registers
+
+        return ElmoInventorySnapshot(
+            status=status,
+            discrete_inputs=dict(discrete_inputs),
+            coils=dict(coils),
+            holding_registers=dict(holding_registers),
+        )
+
+    def _read_status(self) -> ElmoPanelStatus:
+        """Read the arming and alarm status spans."""
 
         def _read_span(start: int) -> tuple[bool, ...]:
-            """Synchronously read a span of discrete inputs from the device."""
-
             _ensure_client_connected(self._client)
 
             response = self._client.read_discrete_inputs(start, count=self._sector_count)
@@ -97,19 +180,136 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoPanelStatus]):
                 raise ConnectionException("Invalid response when reading register")
 
             bits: list[bool] = list(response.bits)
-            # The pymodbus response may include more bits than requested when the
-            # count isn't a multiple of eight. Trim the list to the exact span we
-            # asked for to avoid leaking stale states.
-            trimmed = bits[: self._sector_count]
-            return tuple(bool(bit) for bit in trimmed)
+            return tuple(bool(bit) for bit in bits[: self._sector_count])
 
-        def _read_status() -> ElmoPanelStatus:
-            armed_bits = _read_span(REGISTER_STATUS_START)
-            triggered_bits = _read_span(REGISTER_ALARM_START)
-            return ElmoPanelStatus(armed=armed_bits, triggered=triggered_bits)
+        armed_bits = _read_span(REGISTER_STATUS_START)
+        triggered_bits = _read_span(REGISTER_ALARM_START)
+        return ElmoPanelStatus(armed=armed_bits, triggered=triggered_bits)
+
+    def _read_discrete_inputs(self) -> dict[int, bool]:
+        """Read all registered discrete input addresses."""
+
+        _, groups = _prepare_address_groups(self._discrete_inputs)
+        results: dict[int, bool] = {}
+
+        for start, count, addresses in groups:
+            _ensure_client_connected(self._client)
+            response = self._client.read_discrete_inputs(start, count=count)
+            if not response or getattr(response, "isError", lambda: True)():
+                raise ConnectionException("Invalid response when reading register")
+
+            bits: list[bool] = list(response.bits)
+            for index, address in enumerate(addresses):
+                results[address] = bool(bits[index]) if index < len(bits) else False
+
+        return results
+
+    def _read_coils(self) -> dict[int, bool]:
+        """Read all registered coil addresses."""
+
+        _, groups = _prepare_address_groups(self._coils)
+        results: dict[int, bool] = {}
+
+        for start, count, addresses in groups:
+            _ensure_client_connected(self._client)
+            response = self._client.read_coils(start, count=count)
+            if not response or getattr(response, "isError", lambda: True)():
+                raise ConnectionException("Invalid response when reading register")
+
+            bits: list[bool] = list(response.bits)
+            for index, address in enumerate(addresses):
+                results[address] = bool(bits[index]) if index < len(bits) else False
+
+        return results
+
+    def _read_holding_registers(self) -> dict[int, int | None]:
+        """Read all registered holding register addresses."""
+
+        _, groups = _prepare_address_groups(self._holding_registers)
+        results: dict[int, int | None] = {}
+
+        for start, count, addresses in groups:
+            _ensure_client_connected(self._client)
+            response = self._client.read_holding_registers(start, count=count)
+            if not response or getattr(response, "isError", lambda: True)():
+                raise ConnectionException("Invalid response when reading register")
+
+            registers: list[int] = list(getattr(response, "registers", []) or [])
+            for index, address in enumerate(addresses):
+                results[address] = registers[index] if index < len(registers) else None
+
+        return results
+
+    def write_coil(self, address: int, value: bool) -> None:
+        """Write a single coil and update the cached value."""
+
+        address = int(address)
+        _ensure_client_connected(self._client)
+        response = self._client.write_coil(address, value)
+        if not response or getattr(response, "isError", lambda: True)():
+            raise ConnectionException("Invalid response when writing coil")
+        self._cached_coils[address] = bool(value)
+
+    def write_coils(self, start: int, values: Sequence[bool]) -> None:
+        """Write a sequence of coils and update cached values when tracked."""
+
+        payload = [bool(value) for value in values]
+        if not payload:
+            return
+
+        _ensure_client_connected(self._client)
+        response = self._client.write_coils(start, payload)
+        if not response or getattr(response, "isError", lambda: True)():
+            raise ConnectionException("Invalid response when writing coils")
+
+        for offset, value in enumerate(payload):
+            address = start + offset
+            if address in self._coils or address in self._cached_coils:
+                self._cached_coils[address] = bool(value)
+
+    def close(self) -> None:
+        """Close the underlying Modbus client connection."""
+
+        if self._client.connected:
+            self._client.close()
+
+
+class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoInventorySnapshot]):
+    """Coordinator responsible for polling the Modbus inventory."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        inventory: ElmoModbusInventory,
+        *,
+        scan_interval: int = DEFAULT_SCAN_INTERVAL,
+    ) -> None:
+        """Initialize the coordinator."""
+        self._inventory = inventory
+        super().__init__(
+            hass,
+            LOGGER,
+            name="Elmo Modbus inventory",
+            update_interval=timedelta(seconds=max(1, scan_interval)),
+        )
+
+    @property
+    def inventory(self) -> ElmoModbusInventory:
+        """Return the underlying inventory."""
+
+        return self._inventory
+
+    @property
+    def sector_count(self) -> int:
+        """Expose the inventory sector count for entities."""
+
+        return self._inventory.sector_count
+
+    async def _async_update_data(self) -> ElmoInventorySnapshot:
+        """Poll the Modbus device via the shared inventory."""
 
         try:
-            return await self.hass.async_add_executor_job(_read_status)
+            return await self.hass.async_add_executor_job(self._inventory.refresh)
         except ConnectionException as err:
             raise UpdateFailed(f"Modbus connection failed: {err}") from err
         except Exception as err:  # pragma: no cover - safety net for unexpected errors
@@ -118,182 +318,4 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoPanelStatus]):
     async def async_close(self) -> None:
         """Close the underlying Modbus client connection."""
 
-        def _close() -> None:
-            if self._client.connected:
-                self._client.close()
-
-        await self.hass.async_add_executor_job(_close)
-
-    @property
-    def sector_count(self) -> int:
-        """Return the number of sectors handled by this coordinator."""
-
-        return self._sector_count
-
-
-class ElmoModbusBinarySensorCoordinator(DataUpdateCoordinator[dict[int, bool]]):
-    """Coordinator for reading discrete inputs used by diagnostic binary sensors."""
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        client: ModbusTcpClient,
-        *,
-        addresses: Iterable[int],
-        scan_interval: int = DEFAULT_SCAN_INTERVAL,
-    ) -> None:
-        """Initialise the diagnostic coordinator."""
-
-        super().__init__(
-            hass,
-            LOGGER,
-            name="Elmo Modbus diagnostics",
-            update_interval=timedelta(seconds=max(1, scan_interval)),
-        )
-        self._client = client
-        ordered, groups = _prepare_address_groups(addresses)
-        self._addresses: tuple[int, ...] = ordered
-        self._groups: list[tuple[int, int, tuple[int, ...]]] = list(groups)
-
-    async def _async_update_data(self) -> dict[int, bool]:
-        """Poll the Modbus device for diagnostic discrete inputs."""
-
-        def _read_group(start: int, count: int) -> list[bool]:
-            _ensure_client_connected(self._client)
-
-            response = self._client.read_discrete_inputs(start, count=count)
-            if not response or getattr(response, "isError", lambda: True)():
-                raise ConnectionException("Invalid response when reading register")
-
-            bits: list[bool] = list(response.bits)
-            return bits[:count]
-
-        results: dict[int, bool] = {}
-
-        try:
-            for start, count, addresses in self._groups:
-                bits = await self.hass.async_add_executor_job(_read_group, start, count)
-                for index, address in enumerate(addresses):
-                    results[address] = bool(bits[index]) if index < len(bits) else False
-            return results
-        except ConnectionException as err:
-            raise UpdateFailed(f"Modbus connection failed: {err}") from err
-        except Exception as err:  # pragma: no cover
-            raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
-
-    @property
-    def addresses(self) -> tuple[int, ...]:
-        """Return the discrete input addresses polled by the coordinator."""
-
-        return self._addresses
-
-
-class ElmoModbusSwitchCoordinator(DataUpdateCoordinator[dict[int, bool]]):
-    """Coordinator for reading and tracking output coil states."""
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        client: ModbusTcpClient,
-        *,
-        addresses: Iterable[int],
-        scan_interval: int = DEFAULT_SCAN_INTERVAL,
-    ) -> None:
-        """Initialise the output coordinator."""
-
-        super().__init__(
-            hass,
-            LOGGER,
-            name="Elmo Modbus outputs",
-            update_interval=timedelta(seconds=max(1, scan_interval)),
-        )
-        self._client = client
-        ordered, groups = _prepare_address_groups(addresses)
-        self._addresses = ordered
-        self._groups = list(groups)
-
-    async def _async_update_data(self) -> dict[int, bool]:
-        """Poll the Modbus device for output coil states."""
-
-        def _read_group(start: int, count: int) -> list[bool]:
-            _ensure_client_connected(self._client)
-
-            response = self._client.read_coils(start, count=count)
-            if not response or getattr(response, "isError", lambda: True)():
-                raise ConnectionException("Invalid response when reading register")
-
-            bits: list[bool] = list(response.bits)
-            return bits[:count]
-
-        results: dict[int, bool] = {}
-
-        try:
-            for start, count, addresses in self._groups:
-                bits = await self.hass.async_add_executor_job(_read_group, start, count)
-                for index, address in enumerate(addresses):
-                    results[address] = bool(bits[index]) if index < len(bits) else False
-            return results
-        except ConnectionException as err:
-            raise UpdateFailed(f"Modbus connection failed: {err}") from err
-        except Exception as err:  # pragma: no cover
-            raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
-
-    @property
-    def addresses(self) -> tuple[int, ...]:
-        """Return the coil addresses polled by the coordinator."""
-
-        return self._addresses
-
-
-class ElmoModbusSensorCoordinator(DataUpdateCoordinator[dict[int, int | None]]):
-    """Coordinator for reading holding registers exposed as sensors."""
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        client: ModbusTcpClient,
-        *,
-        addresses: Iterable[int],
-        scan_interval: int = DEFAULT_SCAN_INTERVAL,
-    ) -> None:
-        """Initialise the sensor coordinator."""
-
-        super().__init__(
-            hass,
-            LOGGER,
-            name="Elmo Modbus sensors",
-            update_interval=timedelta(seconds=max(1, scan_interval)),
-        )
-        self._client = client
-        _, groups = _prepare_address_groups(addresses)
-        self._groups = list(groups)
-
-    async def _async_update_data(self) -> dict[int, int | None]:
-        """Poll the Modbus device for holding registers."""
-
-        def _read_group(start: int, count: int) -> list[int]:
-            _ensure_client_connected(self._client)
-
-            response = self._client.read_holding_registers(start, count=count)
-            if not response or getattr(response, "isError", lambda: True)():
-                raise ConnectionException("Invalid response when reading register")
-
-            registers: list[int] = list(getattr(response, "registers", []) or [])
-            return registers[:count]
-
-        results: dict[int, int | None] = {}
-
-        try:
-            for start, count, addresses in self._groups:
-                registers = await self.hass.async_add_executor_job(
-                    _read_group, start, count
-                )
-                for index, address in enumerate(addresses):
-                    results[address] = (
-                        registers[index] if index < len(registers) else None
-                    )
-            return results
-        except ConnectionException as err:
-            raise UpdateFailed(f"Modbus connection failed: {err}") from err
-        except Exception as err:  # pragma: no cover
-            raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
+        await self.hass.async_add_executor_job(self._inventory.close)

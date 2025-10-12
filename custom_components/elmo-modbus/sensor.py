@@ -17,8 +17,8 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
-from .coordinator import ElmoModbusSensorCoordinator
+from .const import DOMAIN
+from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -53,19 +53,12 @@ async def async_setup_entry(
         return
 
     data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: ElmoModbusSensorCoordinator | None = data.get("sensor_coordinator")
+    coordinator: ElmoModbusCoordinator = data["coordinator"]
+    inventory: ElmoModbusInventory = data["inventory"]
 
-    if coordinator is None:
-        client = data["client"]
-        scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        coordinator = ElmoModbusSensorCoordinator(
-            hass,
-            client,
-            addresses=[description.address for description in SENSOR_DESCRIPTIONS],
-            scan_interval=scan_interval,
-        )
-        await coordinator.async_config_entry_first_refresh()
-        data["sensor_coordinator"] = coordinator
+    addresses = [description.address for description in SENSOR_DESCRIPTIONS]
+    if inventory.add_holding_registers(addresses):
+        await coordinator.async_request_refresh()
 
     entities = [
         ElmoModbusSensor(entry, coordinator, description)
@@ -76,7 +69,7 @@ async def async_setup_entry(
         async_add_entities(entities)
 
 
-class ElmoModbusSensor(CoordinatorEntity[ElmoModbusSensorCoordinator], SensorEntity):
+class ElmoModbusSensor(CoordinatorEntity[ElmoModbusCoordinator], SensorEntity):
     """Representation of an Elmo Modbus holding register sensor."""
 
     _attr_has_entity_name = True
@@ -84,7 +77,7 @@ class ElmoModbusSensor(CoordinatorEntity[ElmoModbusSensorCoordinator], SensorEnt
     def __init__(
         self,
         entry: ConfigEntry,
-        coordinator: ElmoModbusSensorCoordinator,
+        coordinator: ElmoModbusCoordinator,
         description: ElmoSensorDescription,
     ) -> None:
         super().__init__(coordinator)
@@ -102,11 +95,11 @@ class ElmoModbusSensor(CoordinatorEntity[ElmoModbusSensorCoordinator], SensorEnt
     def native_value(self) -> float | None:
         """Return the processed value reported by the sensor."""
 
-        data = self.coordinator.data
-        if not data:
+        snapshot = self.coordinator.data
+        if not snapshot:
             return None
 
-        raw_value = data.get(self.entity_description.address)
+        raw_value = snapshot.holding_registers.get(self.entity_description.address)
         if raw_value is None:
             return None
         if raw_value in self.entity_description.invalid_values:

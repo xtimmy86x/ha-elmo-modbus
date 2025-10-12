@@ -14,19 +14,16 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
-from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
 from .const import (
     CONF_OUTPUT_SWITCHES,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     INOUT_MAX_COUNT,
     OPTION_OUTPUT_NAMES,
     OUTPUT_SWITCH_START,
 )
-from .coordinator import ElmoModbusSwitchCoordinator
+from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 from .input_selectors import normalize_input_sensor_config
 
 
@@ -46,8 +43,8 @@ async def async_setup_entry(
     """Set up the Elmo Modbus switches."""
 
     data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: ElmoModbusSwitchCoordinator | None = data.get("switch_coordinator")
-    client: ModbusTcpClient = data["client"]
+    coordinator: ElmoModbusCoordinator = data["coordinator"]
+    inventory: ElmoModbusInventory = data["inventory"]
 
     raw_switches = entry.options.get(CONF_OUTPUT_SWITCHES)
     switch_ids = normalize_input_sensor_config(raw_switches, max_input=INOUT_MAX_COUNT)
@@ -126,19 +123,11 @@ async def async_setup_entry(
 
         entity_registry.async_update_entity(entity_id, new_entity_id=desired_entity_id)
 
-    if coordinator is None or set(coordinator.addresses) != set(addresses):
-        scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        coordinator = ElmoModbusSwitchCoordinator(
-            hass,
-            client,
-            addresses=addresses,
-            scan_interval=scan_interval,
-        )
-        await coordinator.async_config_entry_first_refresh()
-        data["switch_coordinator"] = coordinator
+    if inventory.add_coils(addresses):
+        await coordinator.async_request_refresh()
 
     entities = [
-        ElmoModbusSwitch(entry, coordinator, client, description)
+        ElmoModbusSwitch(entry, coordinator, inventory, description)
         for description in descriptions
     ]
 
@@ -146,7 +135,7 @@ async def async_setup_entry(
         async_add_entities(entities)
 
 
-class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusSwitchCoordinator], SwitchEntity):
+class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusCoordinator], SwitchEntity):
     """Representation of an Elmo Modbus output switch."""
 
     _attr_has_entity_name = True
@@ -154,14 +143,14 @@ class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusSwitchCoordinator], SwitchEnt
     def __init__(
         self,
         entry: ConfigEntry,
-        coordinator: ElmoModbusSwitchCoordinator,
-        client: ModbusTcpClient,
+        coordinator: ElmoModbusCoordinator,
+        inventory: ElmoModbusInventory,
         description: ElmoSwitchDescription,
     ) -> None:
         super().__init__(coordinator)
         self.entity_description = description
         self._config_entry = entry
-        self._client = client
+        self._inventory = inventory
         self._attr_unique_id = f"{entry.entry_id}:switch:{description.key}"
         if description.object_id:
             self._attr_suggested_object_id = description.object_id
@@ -170,10 +159,10 @@ class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusSwitchCoordinator], SwitchEnt
     def is_on(self) -> bool | None:
         """Return the state of the switch."""
 
-        data = self.coordinator.data
-        if not data:
+        snapshot = self.coordinator.data
+        if not snapshot:
             return None
-        value = data.get(self.entity_description.address)
+        value = snapshot.coils.get(self.entity_description.address)
         if value is None:
             return None
         return bool(value)
@@ -204,13 +193,7 @@ class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusSwitchCoordinator], SwitchEnt
         address = self.entity_description.address
 
         def _write() -> None:
-            if not self._client.connected:
-                if not self._client.connect():
-                    raise ConnectionException("Unable to connect to Modbus device")
-
-            response = self._client.write_coil(address, value)
-            if not response or getattr(response, "isError", lambda: True)():
-                raise ConnectionException("Invalid response when writing coil")
+            self._inventory.write_coil(address, value)
 
         try:
             await self.hass.async_add_executor_job(_write)

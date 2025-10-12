@@ -15,11 +15,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
 
 from .const import DEFAULT_SECTORS, DOMAIN, OPTION_USER_CODES, REGISTER_COMMAND_START
-from .coordinator import ElmoModbusCoordinator, ElmoPanelStatus
+from .coordinator import (
+    ElmoModbusCoordinator,
+    ElmoModbusInventory,
+    ElmoPanelStatus,
+)
 from .panels import MODES, PanelDefinition, load_panel_definitions
 
 MODE_LABELS = {
@@ -48,11 +51,12 @@ async def async_setup_entry(
     """Set up the alarm control panel entities from a config entry."""
     data = hass.data[DOMAIN][entry.entry_id]
     coordinator: ElmoModbusCoordinator = data["coordinator"]
-    client: ModbusTcpClient = data["client"]
+    inventory: ElmoModbusInventory = data["inventory"]
+    inventory.require_status()
 
     panels = load_panel_definitions(entry.options, max_sector=coordinator.sector_count)
     entities = [
-        ElmoModbusAlarmControlPanel(entry, coordinator, client, panel)
+        ElmoModbusAlarmControlPanel(entry, coordinator, inventory, panel)
         for panel in panels
     ]
 
@@ -71,7 +75,7 @@ class ElmoModbusAlarmControlPanel(
         self,
         entry: ConfigEntry,
         coordinator: ElmoModbusCoordinator,
-        client: ModbusTcpClient,
+        inventory: ElmoModbusInventory,
         panel: PanelDefinition,
     ) -> None:
         """Initialize the entity."""
@@ -80,7 +84,7 @@ class ElmoModbusAlarmControlPanel(
         self._config_entry = entry
         self._host = entry.data["host"]
         self._port = entry.data["port"]
-        self._client = client
+        self._inventory = inventory
 
         raw_codes = entry.options.get(OPTION_USER_CODES, [])
         if isinstance(raw_codes, list):
@@ -148,9 +152,11 @@ class ElmoModbusAlarmControlPanel(
     ) -> list[bool]:
         """Convert a sector iterable into a bit payload for the command coils."""
 
-        current: ElmoPanelStatus | None = self.coordinator.data
-        if current:
-            payload = list(current.armed)
+        snapshot = self.coordinator.data
+        status: ElmoPanelStatus | None = snapshot.status if snapshot else None
+
+        if status:
+            payload = list(status.armed)
         else:
             span = max(1, min(self.coordinator.sector_count, DEFAULT_SECTORS))
             payload = [False] * span
@@ -180,13 +186,7 @@ class ElmoModbusAlarmControlPanel(
         payload = self._build_command_payload(target_sectors, value=value)
 
         def _write() -> None:
-            if not self._client.connected:
-                if not self._client.connect():
-                    raise ConnectionException("Unable to connect to Modbus device")
-
-            response = self._client.write_coils(REGISTER_COMMAND_START, payload)
-            if not response or getattr(response, "isError", lambda: True)():
-                raise ConnectionException("Invalid response when writing coils")
+            self._inventory.write_coils(REGISTER_COMMAND_START, payload)
 
         try:
             await self.hass.async_add_executor_job(_write)
@@ -245,10 +245,11 @@ class ElmoModbusAlarmControlPanel(
     def alarm_state(self) -> AlarmControlPanelState | None:
         """Return the current state of the alarm panel."""
 
-        status = self.coordinator.data
-        if status is None:
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.status is None:
             return None
 
+        status = snapshot.status
         armed_bits = status.armed
         triggered_bits = status.triggered
 
@@ -316,10 +317,11 @@ class ElmoModbusAlarmControlPanel(
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose additional panel metadata."""
-        status = self.coordinator.data
-        if status is None:
+        snapshot = self.coordinator.data
+        if snapshot is None or snapshot.status is None:
             return {}
 
+        status = snapshot.status
         armed_bits = status.armed
         triggered_bits = status.triggered
         armed_sectors_all = {i + 1 for i, bit in enumerate(armed_bits) if bit}

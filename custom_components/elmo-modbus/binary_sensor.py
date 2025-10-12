@@ -21,14 +21,12 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_INPUT_SENSORS,
-    CONF_SCAN_INTERVAL,
-    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     INOUT_MAX_COUNT,
     INPUT_SENSOR_START,
     OPTION_INPUT_NAMES,
 )
-from .coordinator import ElmoModbusBinarySensorCoordinator
+from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 from .input_selectors import normalize_input_sensor_config
 
 
@@ -158,9 +156,8 @@ async def async_setup_entry(
     """Set up the Elmo Modbus binary sensors."""
 
     data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: ElmoModbusBinarySensorCoordinator | None = data.get(
-        "binary_coordinator"
-    )
+    coordinator: ElmoModbusCoordinator = data["coordinator"]
+    inventory: ElmoModbusInventory = data["inventory"]
 
     raw_input_sensors = entry.options.get(CONF_INPUT_SENSORS)
     input_sensor_ids = normalize_input_sensor_config(
@@ -243,17 +240,8 @@ async def async_setup_entry(
 
         entity_registry.async_update_entity(entity_id, new_entity_id=desired_entity_id)
 
-    if coordinator is None or set(coordinator.addresses) != set(addresses):
-        client = data["client"]
-        scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        coordinator = ElmoModbusBinarySensorCoordinator(
-            hass,
-            client,
-            addresses=addresses,
-            scan_interval=scan_interval,
-        )
-        await coordinator.async_config_entry_first_refresh()
-        data["binary_coordinator"] = coordinator
+    if inventory.add_discrete_inputs(addresses):
+        await coordinator.async_request_refresh()
 
     entities = [
         ElmoModbusBinarySensor(entry, coordinator, description)
@@ -264,9 +252,7 @@ async def async_setup_entry(
         async_add_entities(entities)
 
 
-class ElmoModbusBinarySensor(
-    CoordinatorEntity[ElmoModbusBinarySensorCoordinator], BinarySensorEntity
-):
+class ElmoModbusBinarySensor(CoordinatorEntity[ElmoModbusCoordinator], BinarySensorEntity):
     """Representation of an Elmo Modbus diagnostic binary sensor."""
 
     _attr_has_entity_name = True
@@ -274,7 +260,7 @@ class ElmoModbusBinarySensor(
     def __init__(
         self,
         entry: ConfigEntry,
-        coordinator: ElmoModbusBinarySensorCoordinator,
+        coordinator: ElmoModbusCoordinator,
         description: ElmoBinarySensorDescription,
     ) -> None:
         super().__init__(coordinator)
@@ -288,10 +274,10 @@ class ElmoModbusBinarySensor(
     def is_on(self) -> bool | None:
         """Return the state of the binary sensor."""
 
-        data = self.coordinator.data
-        if not data:
+        snapshot = self.coordinator.data
+        if not snapshot:
             return None
-        value = data.get(self.entity_description.address)
+        value = snapshot.discrete_inputs.get(self.entity_description.address)
         if value is None:
             return None
         return bool(value)

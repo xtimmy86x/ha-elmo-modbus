@@ -9,13 +9,20 @@ alarm_panel = importlib.import_module("custom_components.elmo-modbus.alarm_contr
 coordinator = importlib.import_module("custom_components.elmo-modbus.coordinator")
 
 ElmoModbusAlarmControlPanel = alarm_panel.ElmoModbusAlarmControlPanel
+ElmoInventorySnapshot = coordinator.ElmoInventorySnapshot
 ElmoPanelStatus = coordinator.ElmoPanelStatus
 
 
 def _build_panel(*, managed: set[int], status: ElmoPanelStatus | None, span: int) -> ElmoModbusAlarmControlPanel:
     panel = object.__new__(ElmoModbusAlarmControlPanel)
     panel._managed_sectors = managed  # type: ignore[attr-defined]
-    panel.coordinator = SimpleNamespace(data=status, sector_count=span)  # type: ignore[attr-defined]
+    snapshot = ElmoInventorySnapshot(
+        status=status,
+        discrete_inputs={},
+        coils={},
+        holding_registers={},
+    )
+    panel.coordinator = SimpleNamespace(data=snapshot, sector_count=span)  # type: ignore[attr-defined]
     return panel
 
 
