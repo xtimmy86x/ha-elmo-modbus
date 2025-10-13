@@ -25,6 +25,9 @@ from .coordinator import (
 )
 from .panels import MODES, PanelDefinition, load_panel_definitions
 
+import logging
+_LOGGER = logging.getLogger(__name__)
+
 MODE_LABELS = {
     "away": "Arm Away",
     "home": "Arm Home",

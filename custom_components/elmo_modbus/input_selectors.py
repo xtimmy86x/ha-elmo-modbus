@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Iterable, Sequence
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 _INPUT_RANGE_PATTERN = re.compile(r"^(?P<start>\d+)\s*-\s*(?P<end>\d+)$")
 

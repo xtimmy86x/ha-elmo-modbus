@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 from typing import Any, Iterable, Mapping, Sequence
 
 from homeassistant.util import slugify
@@ -15,6 +16,8 @@ from .const import (
     OPTION_DISARM_SECTORS,
     OPTION_PANELS,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 LEGACY_OPTION_MAP = {
     "away": OPTION_ARMED_AWAY_SECTORS,

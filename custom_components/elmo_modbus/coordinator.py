@@ -7,9 +7,6 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
-import logging
-_LOGGER = logging.getLogger(__name__)
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.client import ModbusTcpClient
@@ -22,8 +19,8 @@ from .const import (
     REGISTER_STATUS_START,
 )
 
-LOGGER = logging.getLogger(__name__)
-
+_LOGGER = logging.getLogger(__name__)
+_COORD_LOGGER = logging.getLogger(__name__ + ".coordinator_internal")
 
 def _ensure_client_connected(client: ModbusTcpClient) -> None:
     """Ensure the Modbus client is connected before performing an operation."""
@@ -290,7 +287,7 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoInventorySnapshot]):
         self._inventory = inventory
         super().__init__(
             hass,
-            LOGGER,
+            _COORD_LOGGER,
             name="Elmo Modbus inventory",
             update_interval=timedelta(seconds=max(1, scan_interval)),
         )
@@ -309,7 +306,7 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoInventorySnapshot]):
 
     async def _async_update_data(self) -> ElmoInventorySnapshot:
         """Poll the Modbus device via the shared inventory."""
-
+        
         try:
             return await self.hass.async_add_executor_job(self._inventory.refresh)
         except ConnectionException as err:

@@ -30,6 +30,8 @@ from .const import (
 from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 from .input_selectors import normalize_input_sensor_config
 
+import logging
+_LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class ElmoBinarySensorDescription(BinarySensorEntityDescription):

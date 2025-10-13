@@ -20,6 +20,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 
+import logging
+_LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class ElmoSensorDescription(SensorEntityDescription):
