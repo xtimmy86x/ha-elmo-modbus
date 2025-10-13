@@ -25,36 +25,8 @@ else:  # pragma: no cover - type alias for stubs
 SERVICE_EXCLUDE_INPUTS = "exclude_inputs"
 SERVICE_INCLUDE_INPUTS = "include_inputs"
 
-ATTR_INPUTS = "inputs"
 ATTR_INPUT_ENTITIES = "input_entities"
 ATTR_EXCLUDED = "excluded"
-
-
-def _validate_inputs(value: Any) -> list[int]:
-    """Validate and normalize the provided input numbers."""
-
-    if value in (None, ""):
-        return []
-
-    if isinstance(value, str):
-        raw_items = [part.strip() for part in value.replace(";", ",").split(",")]
-        candidates = [item for item in raw_items if item]
-    elif isinstance(value, Iterable):
-        candidates = list(value)
-    else:
-        candidates = [value]
-
-    results: list[int] = []
-    for candidate in candidates:
-        try:
-            number = int(candidate)
-        except (TypeError, ValueError) as exc:
-            raise vol.Invalid("invalid input number") from exc
-        if number < 1 or number > INOUT_MAX_COUNT:
-            raise vol.Invalid("input number out of range")
-        results.append(number)
-
-    return results
 
 
 def _build_service_schema() -> Any:
@@ -63,8 +35,6 @@ def _build_service_schema() -> Any:
     if hasattr(vol, "Optional") and hasattr(vol, "Schema"):
         return vol.Schema(
             {
-                vol.Optional("entity_id", default=[]): cv.entity_ids,
-                vol.Optional(ATTR_INPUTS, default=[]): _validate_inputs,
                 vol.Optional(ATTR_INPUT_ENTITIES, default=[]): cv.entity_ids,
             }
         )
@@ -82,8 +52,6 @@ def _build_service_schema() -> Any:
                 raise vol.Invalid("invalid entity id") from exc
 
         parsed_data = {
-            "entity_id": _coerce_entities(data.get("entity_id")),
-            ATTR_INPUTS: _validate_inputs(data.get(ATTR_INPUTS)),
             ATTR_INPUT_ENTITIES: _coerce_entities(data.get(ATTR_INPUT_ENTITIES)),
         }
         return parsed_data
@@ -178,41 +146,13 @@ async def _async_apply_input_exclusion(
 
     parsed = _SERVICE_BASE_SCHEMA(data)
 
-    input_numbers = set(parsed.get(ATTR_INPUTS, []))
     input_entity_ids = parsed.get(ATTR_INPUT_ENTITIES, [])
-    panel_entity_ids = parsed.get("entity_id", [])
 
     entity_mapping = _group_input_entities_by_entry(hass, input_entity_ids)
 
     target_entries: dict[str, set[int]] = {
         entry_id: set(numbers) for entry_id, numbers in entity_mapping.items()
     }
-
-    registry = er.async_get(hass)
-    for entity_id in panel_entity_ids:
-        entry = registry.async_get(entity_id)
-        if not entry or entry.platform != DOMAIN or not entry.config_entry_id:
-            continue
-        target_entries.setdefault(entry.config_entry_id, set())
-
-    if input_numbers:
-        if not target_entries:
-            # Attempt to infer the single available entry if none were specified
-            available_entries = [
-                entry_id
-                for entry_id, entry_data in hass.data.get(DOMAIN, {}).items()
-                if isinstance(entry_data, dict)
-                and "inventory" in entry_data
-                and "coordinator" in entry_data
-            ]
-            if len(available_entries) == 1:
-                target_entries.setdefault(available_entries[0], set())
-            else:
-                _LOGGER.warning(
-                    "Cannot determine target alarm panel for inputs: %s", input_numbers
-                )
-        for entry_inputs in target_entries.values():
-            entry_inputs.update(input_numbers)
 
     if not target_entries:
         _LOGGER.warning("No valid alarm inputs specified for service call")

@@ -61,33 +61,34 @@ def test_async_handle_set_input_exclusion_combines_sources() -> None:
     }
 
     registry = er.async_get(hass)
+    registry.entities["binary_sensor.elmo_modbus_input_3"] = er.RegistryEntry(
+        entity_id="binary_sensor.elmo_modbus_input_3",
+        unique_id="entry1:binary:alarm_input_3",
+        platform=DOMAIN,
+        config_entry_id="entry1",
+    )
     registry.entities["binary_sensor.elmo_modbus_input_5"] = er.RegistryEntry(
         entity_id="binary_sensor.elmo_modbus_input_5",
         unique_id="entry1:binary:alarm_input_5",
         platform=DOMAIN,
         config_entry_id="entry1",
     )
-    registry.entities["alarm_control_panel.elmo_panel"] = er.RegistryEntry(
-        entity_id="alarm_control_panel.elmo_panel",
-        unique_id="entry1:alarm:panel",
-        platform=DOMAIN,
-        config_entry_id="entry1",
-    )
 
     call = SimpleNamespace(
         data={
-            services.ATTR_INPUTS: [3],
-            services.ATTR_INPUT_ENTITIES: ["binary_sensor.elmo_modbus_input_5"],
+            services.ATTR_INPUT_ENTITIES: [
+                "binary_sensor.elmo_modbus_input_3",
+                "binary_sensor.elmo_modbus_input_5",
+            ],
             services.ATTR_EXCLUDED: True,
-            "entity_id": ["alarm_control_panel.elmo_panel"],
         }
     )
 
     asyncio.run(services._async_handle_set_input_exclusion(hass, call))
 
     expected_addresses = {
-        INPUT_SENSOR_EXCLUDED_START + 3 - 1,
         INPUT_SENSOR_EXCLUDED_START + 5 - 1,
+        INPUT_SENSOR_EXCLUDED_START + 3 - 1,
     }
 
     assert {address for address, _ in inventory.writes} == expected_addresses
