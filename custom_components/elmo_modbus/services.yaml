@@ -1,0 +1,54 @@
+exclude_inputs:
+  name: Exclude alarm inputs
+  description: Disable the specified alarm inputs on the Elmo panel by writing to the exclusion coil bank.
+  fields:
+    entity_id:
+      name: Alarm panels
+      description: Select one or more Elmo alarm panels to update. When omitted, the integration will try to infer the target panel from the provided inputs.
+      selector:
+        entity:
+          integration: elmo_modbus
+          domain: alarm_control_panel
+          multiple: true
+    inputs:
+      name: Input numbers
+      description: List of alarm input numbers (1-1024) to update. Accepts a comma-separated string or an array of numbers.
+      example: "1,2,3"
+      selector:
+        text:
+          multiline: false
+    input_entities:
+      name: Input entities
+      description: Binary sensor entities from this integration whose input numbers should be updated.
+      selector:
+        entity:
+          integration: elmo_modbus
+          domain: binary_sensor
+          multiple: true
+include_inputs:
+  name: Include alarm inputs
+  description: Re-enable the specified alarm inputs on the Elmo panel by writing to the exclusion coil bank.
+  fields:
+    entity_id:
+      name: Alarm panels
+      description: Select one or more Elmo alarm panels to update. When omitted, the integration will try to infer the target panel from the provided inputs.
+      selector:
+        entity:
+          integration: elmo_modbus
+          domain: alarm_control_panel
+          multiple: true
+    inputs:
+      name: Input numbers
+      description: List of alarm input numbers (1-1024) to update. Accepts a comma-separated string or an array of numbers.
+      example: "1,2,3"
+      selector:
+        text:
+          multiline: false
+    input_entities:
+      name: Input entities
+      description: Binary sensor entities from this integration whose input numbers should be updated.
+      selector:
+        entity:
+          integration: elmo_modbus
+          domain: binary_sensor
+          multiple: true
