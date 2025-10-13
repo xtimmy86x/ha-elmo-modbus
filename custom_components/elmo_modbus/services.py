@@ -27,17 +27,23 @@ SERVICE_INCLUDE_INPUTS = "include_inputs"
 
 ATTR_INPUT_ENTITIES = "input_entities"
 ATTR_EXCLUDED = "excluded"
+ATTR_ENTITY_ID = "entity_id"
 
 
 def _build_service_schema() -> Any:
     """Return a schema or callable used to validate service data."""
 
     if hasattr(vol, "Optional") and hasattr(vol, "Schema"):
-        return vol.Schema(
-            {
-                vol.Optional(ATTR_INPUT_ENTITIES, default=[]): cv.entity_ids,
-            }
-        )
+        schema_fields = {
+            vol.Optional(ATTR_INPUT_ENTITIES, default=[]): cv.entity_ids,
+        }
+        try:  # pragma: no cover - depends on Home Assistant runtime
+            make_entity_service_schema = cv.make_entity_service_schema  # type: ignore[attr-defined]
+        except AttributeError:
+            schema_fields[vol.Optional(ATTR_ENTITY_ID, default=[])] = cv.entity_ids
+            return vol.Schema(schema_fields)
+
+        return make_entity_service_schema(schema_fields)
 
     def _fallback_schema(data: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(data, dict):
@@ -53,6 +59,7 @@ def _build_service_schema() -> Any:
 
         parsed_data = {
             ATTR_INPUT_ENTITIES: _coerce_entities(data.get(ATTR_INPUT_ENTITIES)),
+            ATTR_ENTITY_ID: _coerce_entities(data.get(ATTR_ENTITY_ID)),
         }
         return parsed_data
 
@@ -145,7 +152,22 @@ async def _async_apply_input_exclusion(
     """Process a service call to include or exclude alarm inputs."""
 
     parsed = _SERVICE_BASE_SCHEMA(data)
-    input_entity_ids = parsed.get(ATTR_INPUT_ENTITIES, [])
+
+    def _as_list(value: Any) -> list[str]:
+        if not value:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, (set, tuple)):
+            return [str(item) for item in value]
+        if isinstance(value, str):
+            return [value]
+        return list(value)
+
+    combined_entities: list[str] = []
+    combined_entities.extend(_as_list(parsed.get(ATTR_INPUT_ENTITIES)))
+    combined_entities.extend(_as_list(parsed.get(ATTR_ENTITY_ID)))
+    input_entity_ids = list(dict.fromkeys(combined_entities))
     entity_mapping = _group_input_entities_by_entry(hass, input_entity_ids)
     target_entries: dict[str, set[int]] = {
         entry_id: set(numbers) for entry_id, numbers in entity_mapping.items()

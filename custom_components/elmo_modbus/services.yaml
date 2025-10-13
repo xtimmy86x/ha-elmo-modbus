@@ -1,24 +1,14 @@
 exclude_inputs:
   name: Exclude alarm inputs
   description: Disable the specified alarm inputs on the Elmo panel by writing to the exclusion coil bank.
-  fields:
-    input_entities:
-      name: Input entities
-      description: Binary sensor entities from this integration whose input numbers should be updated.
-      selector:
-        entity:
-          integration: elmo_modbus
-          domain: binary_sensor
-          multiple: true
+  target:
+    entity:
+      integration: elmo_modbus
+      domain: binary_sensor
 include_inputs:
   name: Include alarm inputs
   description: Re-enable the specified alarm inputs on the Elmo panel by writing to the exclusion coil bank.
-  fields:
-    input_entities:
-      name: Input entities
-      description: Binary sensor entities from this integration whose input numbers should be updated.
-      selector:
-        entity:
-          integration: elmo_modbus
-          domain: binary_sensor
-          multiple: true
+  target:
+    entity:
+      integration: elmo_modbus
+      domain: binary_sensor

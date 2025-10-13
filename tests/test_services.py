@@ -51,7 +51,7 @@ def test_group_input_entities_by_entry() -> None:
     assert mapping == {"entry1": {5}}
 
 
-def test_async_handle_set_input_exclusion_combines_sources() -> None:
+def test_async_handle_set_input_exclusion_uses_target_entities() -> None:
     hass = HomeAssistant()
     inventory = DummyInventory()
     coordinator = DummyCoordinator()
@@ -76,7 +76,7 @@ def test_async_handle_set_input_exclusion_combines_sources() -> None:
 
     call = SimpleNamespace(
         data={
-            services.ATTR_INPUT_ENTITIES: [
+            "entity_id": [
                 "binary_sensor.elmo_modbus_input_3",
                 "binary_sensor.elmo_modbus_input_5",
             ],
@@ -93,4 +93,38 @@ def test_async_handle_set_input_exclusion_combines_sources() -> None:
 
     assert {address for address, _ in inventory.writes} == expected_addresses
     assert all(value is False for _, value in inventory.writes)
+    assert coordinator.refreshed
+
+
+def test_async_handle_set_input_exclusion_accepts_legacy_entities() -> None:
+    hass = HomeAssistant()
+    inventory = DummyInventory()
+    coordinator = DummyCoordinator()
+    hass.data.setdefault(DOMAIN, {})["entry1"] = {
+        "inventory": inventory,
+        "coordinator": coordinator,
+    }
+
+    registry = er.async_get(hass)
+    registry.entities["binary_sensor.elmo_modbus_input_7"] = er.RegistryEntry(
+        entity_id="binary_sensor.elmo_modbus_input_7",
+        unique_id="entry1:binary:alarm_input_7",
+        platform=DOMAIN,
+        config_entry_id="entry1",
+    )
+
+    call = SimpleNamespace(
+        data={
+            services.ATTR_INPUT_ENTITIES: [
+                "binary_sensor.elmo_modbus_input_7",
+            ],
+            services.ATTR_EXCLUDED: False,
+        }
+    )
+
+    asyncio.run(services._async_handle_set_input_exclusion(hass, call))
+
+    expected_address = INPUT_SENSOR_EXCLUDED_START + 7 - 1
+
+    assert inventory.writes == [(expected_address, True)]
     assert coordinator.refreshed
