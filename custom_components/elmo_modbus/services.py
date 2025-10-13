@@ -145,21 +145,16 @@ async def _async_apply_input_exclusion(
     """Process a service call to include or exclude alarm inputs."""
 
     parsed = _SERVICE_BASE_SCHEMA(data)
-
     input_entity_ids = parsed.get(ATTR_INPUT_ENTITIES, [])
-
     entity_mapping = _group_input_entities_by_entry(hass, input_entity_ids)
-
     target_entries: dict[str, set[int]] = {
         entry_id: set(numbers) for entry_id, numbers in entity_mapping.items()
     }
-
     if not target_entries:
         _LOGGER.warning("No valid alarm inputs specified for service call")
         return
 
     value = not excluded
-
     for entry_id, numbers in target_entries.items():
         if not numbers:
             continue
