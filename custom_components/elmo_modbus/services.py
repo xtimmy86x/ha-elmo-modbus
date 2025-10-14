@@ -12,6 +12,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN, INOUT_MAX_COUNT, INPUT_EXCLUDE_START
 
@@ -116,6 +117,9 @@ def _group_input_entities_by_entry(
     for entity_id in entity_ids:
         entry = registry.async_get(entity_id)
         if not entry or entry.platform != DOMAIN or not entry.unique_id:
+            continue
+        # Escludi le entità diagnostiche
+        if entry.entity_category == EntityCategory.DIAGNOSTIC:
             continue
         config_entry_id = entry.config_entry_id
         if not config_entry_id:
