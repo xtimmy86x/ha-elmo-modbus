@@ -13,6 +13,7 @@ from homeassistant.components.alarm_control_panel.const import CodeFormat
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.config_validation import slugify
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pymodbus.exceptions import ConnectionException
@@ -102,7 +103,8 @@ class ElmoModbusAlarmControlPanel(
 
         self._attr_unique_id = f"{entry.entry_id}:{panel.slug}"
         self._attr_name = panel.name
-        self.entity_id = f"alarm_control_panel.{panel.slug}"
+        device_slug = slugify(entry.title)
+        self.entity_id = f"alarm_control_panel.{device_slug}_{panel.slug}"
 
         self._mode_sectors: dict[str, set[int]] = {}
         for mode in MODES:
@@ -231,7 +233,7 @@ class ElmoModbusAlarmControlPanel(
         return DeviceInfo(
             identifiers={(DOMAIN, self._config_entry.entry_id)},
             manufacturer="Elmo",
-            name="Elmo Modbus Control Panel",
+            name=self._config_entry.title,
         )
 
     @property

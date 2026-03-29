@@ -117,5 +117,5 @@ class ElmoModbusSensor(CoordinatorEntity[ElmoModbusCoordinator], SensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._config_entry.entry_id)},
             manufacturer="Elmo",
-            name="Elmo Modbus Control Panel",
+            name=self._config_entry.title,
         )

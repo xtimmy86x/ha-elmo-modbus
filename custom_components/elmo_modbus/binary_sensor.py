@@ -241,7 +241,8 @@ async def async_setup_entry(
         if entity_id is None:
             continue
 
-        desired_entity_id = f"binary_sensor.{description.object_id}"
+        device_slug = slugify(entry.title)
+        desired_entity_id = f"binary_sensor.{device_slug}_{description.object_id}"
         if entity_id == desired_entity_id:
             continue
 
@@ -300,7 +301,7 @@ class ElmoModbusBinarySensor(CoordinatorEntity[ElmoModbusCoordinator], BinarySen
         return DeviceInfo(
             identifiers={(DOMAIN, self._config_entry.entry_id)},
             manufacturer="Elmo",
-            name="Elmo Modbus Control Panel",
+            name=self._config_entry.title,
         )
 
     @property
