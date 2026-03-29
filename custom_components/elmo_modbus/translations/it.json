@@ -262,6 +262,13 @@
                "on":"Sì",
                "off":"No"
             }
+         },
+         "connection_status":{
+            "name":"Stato connessione",
+            "state":{
+               "on":"Connesso",
+               "off":"Disconnesso"
+            }
          }
       },
       "switch":{

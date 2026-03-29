@@ -21,6 +21,8 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_INPUT_SENSORS,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     INOUT_MAX_COUNT,
     INPUT_SENSOR_EXCLUDED_START,
@@ -255,13 +257,14 @@ async def async_setup_entry(
     if inventory.add_discrete_inputs(addresses):
         await coordinator.async_request_refresh()
 
-    entities = [
+    entities: list[BinarySensorEntity] = [
         ElmoModbusBinarySensor(entry, coordinator, description)
         for description in descriptions
     ]
 
-    if entities:
-        async_add_entities(entities)
+    entities.append(ElmoConnectionStatusSensor(entry, coordinator))
+
+    async_add_entities(entities)
 
 
 class ElmoModbusBinarySensor(CoordinatorEntity[ElmoModbusCoordinator], BinarySensorEntity):
@@ -324,3 +327,47 @@ class ElmoModbusBinarySensor(CoordinatorEntity[ElmoModbusCoordinator], BinarySen
 
         attrs["excluded"] = "on" if bool(excluded_value) else "off"
         return attrs
+
+
+class ElmoConnectionStatusSensor(
+    CoordinatorEntity[ElmoModbusCoordinator], BinarySensorEntity
+):
+    """Binary sensor that reflects the Modbus connection status."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "connection_status"
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        coordinator: ElmoModbusCoordinator,
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = entry
+        self._attr_unique_id = f"{entry.entry_id}:binary:connection_status"
+
+    @property
+    def is_on(self) -> bool:
+        """Return True when the coordinator last update succeeded."""
+        return self.coordinator.last_update_success
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
+            manufacturer="Elmo",
+            name=self._config_entry.title,
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        entry = self._config_entry
+        return {
+            "host": entry.data.get("host"),
+            "port": entry.data.get("port"),
+            "scan_interval": entry.data.get(
+                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+            ),
+        }

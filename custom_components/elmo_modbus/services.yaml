@@ -5,6 +5,7 @@ exclude_inputs:
     entity:
       integration: elmo_modbus
       domain: binary_sensor
+      device_class: safety
 include_inputs:
   name: Include alarm inputs
   description: Re-enable the specified alarm inputs on the Elmo panel by writing to the exclusion coil bank.
@@ -12,3 +13,4 @@ include_inputs:
     entity:
       integration: elmo_modbus
       domain: binary_sensor
+      device_class: safety
