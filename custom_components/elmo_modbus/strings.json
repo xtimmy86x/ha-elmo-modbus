@@ -70,7 +70,8 @@
             "description":"Assign a descriptive name to each of the {count} selected alarm inputs.",
             "data": {
                "default_input_name": "Alarm input {number}",
-               "pre_title":"Name of input"
+               "pre_title":"Name of input",
+               "battery_label":"Battery monitoring input {number}"
             }
          },
          "outputs":{

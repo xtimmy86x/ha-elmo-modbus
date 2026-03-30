@@ -23,6 +23,7 @@ from .const import (
     DEFAULT_SECTORS,
     DOMAIN,
     INOUT_MAX_COUNT,
+    OPTION_INPUT_BATTERY,
     OPTION_INPUT_NAMES,
     OPTION_OUTPUT_NAMES,
     OPTION_USER_CODES,
@@ -41,8 +42,8 @@ _LOGGER = logging.getLogger(__name__)
 
 async def _async_input_name_templates(
     hass: HomeAssistant,
-) -> tuple[str, str]:
-    """Return templates for default input names and titles.
+) -> tuple[str, str, str]:
+    """Return templates for default input names, titles, and battery labels.
 
     The Home Assistant translation API is relatively expensive, therefore the
     templates are fetched once per flow and reused when building the form.
@@ -58,7 +59,7 @@ async def _async_input_name_templates(
         )
     except Exception:  # pragma: no cover - defensive, HA handles logging
         _LOGGER.debug("Falling back to default input name templates", exc_info=True)
-        return "Alarm input {number}", "Name of alarm input"
+        return "Alarm input {number}", "Name of alarm input", "Battery monitoring input {number}"
 
     base_key = f"component.{DOMAIN}.options.step.input_names.data.{{}}"
     default_template = translations.get(
@@ -67,7 +68,10 @@ async def _async_input_name_templates(
     title_template = translations.get(
         base_key.format("pre_title"), "Name of alarm input"
     )
-    return str(default_template), str(title_template)
+    battery_template = translations.get(
+        base_key.format("battery_label"), "Battery monitoring input {number}"
+    )
+    return str(default_template), str(title_template), str(battery_template)
 
 
 async def _async_output_name_templates(
@@ -329,11 +333,22 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                     self._input_names[str(sensor)] = name
 
         self._pending_input_sensor_ids: list[int] | None = None
-        self._input_name_templates: tuple[str, str] | None = None
+        self._input_name_templates: tuple[str, str, str] | None = None
         # ``self.hass`` is not available when the options flow handler is
         # constructed. The active language is captured the first time the
         # input naming step runs instead.
         self._input_name_language: str | None = None
+
+        raw_battery = config_entry.options.get(OPTION_INPUT_BATTERY, [])
+        self._input_battery: set[int] = set()
+        if isinstance(raw_battery, list):
+            for item in raw_battery:
+                try:
+                    bid = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if bid in self._input_sensor_ids:
+                    self._input_battery.add(bid)
 
         self._output_switch_ids: list[int] = normalize_input_sensor_config(
             config_entry.options.get(CONF_OUTPUT_SWITCHES),
@@ -506,6 +521,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     self._input_sensor_ids = []
                     self._input_names = {}
+                    self._input_battery = set()
                     self._pending_input_sensor_ids = None
                     self._update_config_entry_options()
                     return await self.async_step_init()
@@ -563,6 +579,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         if not sensor_ids:
             self._input_sensor_ids = []
             self._input_names = {}
+            self._input_battery = set()
             self._pending_input_sensor_ids = None
             self._update_config_entry_options()
             return await self.async_step_init()
@@ -578,15 +595,18 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 self._input_name_templates = (
                     "Alarm input {number}",
                     "Name of alarm input",
+                    "Battery monitoring input {number}",
                 )
             else:
                 self._input_name_templates = await _async_input_name_templates(hass)
 
-        default_template, title_template = self._input_name_templates
+        default_template, title_template, battery_template = self._input_name_templates
 
         errors: dict[str, str] = {}
         collected: dict[str, str] = {}
+        collected_battery: set[int] = set()
         field_labels: dict[int, str] = {}
+        battery_labels: dict[int, str] = {}
         defaults: dict[int, str] = {}
 
         for sensor in sensor_ids:
@@ -594,6 +614,12 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             if label == title_template:
                 label = f"{label} {sensor}"
             field_labels[sensor] = label
+
+            bat_label = _format_with_number(battery_template, sensor)
+            if bat_label == battery_template:
+                bat_label = f"{bat_label} {sensor}"
+            battery_labels[sensor] = bat_label
+
             stored_name = self._input_names.get(str(sensor))
             if stored_name:
                 defaults[sensor] = stored_name
@@ -612,9 +638,14 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     collected[str(sensor)] = raw_value
 
+                bat_field = battery_labels[sensor]
+                if user_input.get(bat_field, False):
+                    collected_battery.add(sensor)
+
             if not errors:
                 self._input_sensor_ids = sensor_ids
                 self._input_names = collected
+                self._input_battery = collected_battery
                 self._pending_input_sensor_ids = None
                 self._update_config_entry_options()
                 return await self.async_step_init()
@@ -623,6 +654,8 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         for sensor in sensor_ids:
             field = field_labels[sensor]
             schema_dict[vol.Required(field, default=defaults[sensor])] = str
+            bat_field = battery_labels[sensor]
+            schema_dict[vol.Optional(bat_field, default=sensor in self._input_battery)] = bool
 
         schema = vol.Schema(schema_dict)
 
@@ -841,6 +874,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         options[OPTION_INPUT_NAMES] = {
             key: value for key, value in self._input_names.items() if key and value
         }
+        options[OPTION_INPUT_BATTERY] = sorted(self._input_battery)
         options[CONF_OUTPUT_SWITCHES] = list(self._output_switch_ids)
         options[OPTION_OUTPUT_NAMES] = {
             key: value for key, value in self._output_names.items() if key and value
@@ -851,7 +885,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
     def _retain_input_names(self, sensor_ids: list[int]) -> None:
-        """Preserve configured names for the provided sensor identifiers."""
+        """Preserve configured names and battery flags for the provided sensor identifiers."""
 
         existing: dict[str, str] = {}
         for sensor in sensor_ids:
@@ -859,6 +893,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             if key in self._input_names:
                 existing[key] = self._input_names[key]
         self._input_names = existing
+        self._input_battery = self._input_battery & set(sensor_ids)
 
     def _retain_output_names(self, switch_ids: list[int]) -> None:
         """Preserve configured names for the provided output identifiers."""

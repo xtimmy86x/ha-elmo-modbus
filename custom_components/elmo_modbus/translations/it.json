@@ -70,7 +70,8 @@
             "description":"Assegna un nome descrittivo a ciascuno dei {count} ingressi di allarme selezionati.",
             "data": {
                "default_input_name": "Ingresso allarme {number}",
-               "pre_title":"Nome dell'ingresso"
+               "pre_title":"Nome dell'ingresso",
+               "battery_label":"Monitoraggio batteria ingresso {number}"
             }
          },
          "outputs":{

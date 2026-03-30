@@ -25,8 +25,10 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     INOUT_MAX_COUNT,
+    INPUT_BATTERY_START,
     INPUT_SENSOR_EXCLUDED_START,
     INPUT_SENSOR_START,
+    OPTION_INPUT_BATTERY,
     OPTION_INPUT_NAMES,
 )
 from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
@@ -42,6 +44,7 @@ class ElmoBinarySensorDescription(BinarySensorEntityDescription):
     address: int
     object_id: str | None = None
     excluded_address: int | None = None
+    battery_address: int | None = None
 
 
 BASE_SENSOR_DESCRIPTIONS: tuple[ElmoBinarySensorDescription, ...] = (
@@ -190,6 +193,17 @@ async def async_setup_entry(
             if name:
                 input_names[sensor] = name
 
+    raw_battery = entry.options.get(OPTION_INPUT_BATTERY, [])
+    battery_inputs: set[int] = set()
+    if isinstance(raw_battery, list):
+        for item in raw_battery:
+            try:
+                bid = int(item)
+            except (TypeError, ValueError):
+                continue
+            if bid in input_sensor_ids:
+                battery_inputs.add(bid)
+
     input_descriptions: list[ElmoBinarySensorDescription] = []
     used_object_ids: set[str] = set()
     for index in sorted(input_sensor_ids):
@@ -200,6 +214,9 @@ async def async_setup_entry(
             "device_class": BinarySensorDeviceClass.SAFETY,
             "excluded_address": INPUT_SENSOR_EXCLUDED_START + index - 1,
         }
+
+        if index in battery_inputs:
+            description_kwargs["battery_address"] = INPUT_BATTERY_START + index - 1
 
         if custom_name:
             description_kwargs["name"] = custom_name
@@ -228,6 +245,8 @@ async def async_setup_entry(
         address_set.add(description.address)
         if description.excluded_address is not None:
             address_set.add(description.excluded_address)
+        if description.battery_address is not None:
+            address_set.add(description.battery_address)
 
     addresses = tuple(sorted(address_set))
 
@@ -317,15 +336,17 @@ class ElmoModbusBinarySensor(CoordinatorEntity[ElmoModbusCoordinator], BinarySen
         attrs: dict[str, str] = {}
 
         excluded_addr = self.entity_description.excluded_address
-        if excluded_addr is None:
-            return attrs  # nessun attributo "excluded" per questo sensore
+        if excluded_addr is not None:
+            excluded_value = snapshot.discrete_inputs.get(excluded_addr)
+            if excluded_value is not None:
+                attrs["excluded"] = "on" if bool(excluded_value) else "off"
 
-        excluded_value = snapshot.discrete_inputs.get(excluded_addr)
-        if excluded_value is None:
-            # il coordinatore non ha (ancora) il valore: non esporre l'attributo
-            return attrs
+        battery_addr = self.entity_description.battery_address
+        if battery_addr is not None:
+            battery_value = snapshot.discrete_inputs.get(battery_addr)
+            if battery_value is not None:
+                attrs["battery_low"] = "on" if bool(battery_value) else "off"
 
-        attrs["excluded"] = "on" if bool(excluded_value) else "off"
         return attrs
 
 
