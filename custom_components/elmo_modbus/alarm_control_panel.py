@@ -290,8 +290,15 @@ class ElmoModbusAlarmControlPanel(
             MODE_TO_STATE[mode]: sectors for mode, sectors in self._mode_sectors.items()
         }
 
-        # match esatto
+        # armed_away ha priorità: se tutti i suoi settori sono attivi -> ARMED_AWAY
+        away_sectors = options_map.get(AlarmControlPanelState.ARMED_AWAY)
+        if away_sectors and away_sectors <= panel_armed_sectors:
+            return AlarmControlPanelState.ARMED_AWAY
+
+        # match esatto per le restanti modalità
         for state, sectors in options_map.items():
+            if state == AlarmControlPanelState.ARMED_AWAY:
+                continue
             if panel_armed_sectors == sectors:
                 return state
 

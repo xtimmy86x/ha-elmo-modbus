@@ -162,6 +162,7 @@ def pytest_configure() -> None:
     config_validation_module.config_entry_only_config_schema = (
         config_entry_only_config_schema  # type: ignore[attr-defined]
     )
+    config_validation_module.slugify = _slugify  # type: ignore[attr-defined]
 
     def entity_ids(value: Any) -> list[str]:
         if isinstance(value, str):
@@ -199,11 +200,13 @@ def pytest_configure() -> None:
             unique_id: str,
             platform: str | None = None,
             config_entry_id: str | None = None,
+            entity_category: Any | None = None,
         ) -> None:
             self.entity_id = entity_id
             self.unique_id = unique_id
             self.platform = platform
             self.config_entry_id = config_entry_id
+            self.entity_category = entity_category
 
     class EntityRegistry:  # pragma: no cover - helper for service tests
         def __init__(self) -> None:
@@ -267,7 +270,12 @@ def pytest_configure() -> None:
         def __init__(self, **kwargs: Any) -> None:
             super().__init__(**kwargs)
 
+    class EntityCategory(enum.Enum):  # pragma: no cover - stub
+        CONFIG = "config"
+        DIAGNOSTIC = "diagnostic"
+
     entity_module.DeviceInfo = DeviceInfo  # type: ignore[attr-defined]
+    entity_module.EntityCategory = EntityCategory  # type: ignore[attr-defined]
     sys.modules["homeassistant.helpers.entity"] = entity_module
     helpers_module.entity = entity_module  # type: ignore[attr-defined]
 

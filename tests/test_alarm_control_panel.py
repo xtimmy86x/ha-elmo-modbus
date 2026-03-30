@@ -8,9 +8,14 @@ from types import SimpleNamespace
 alarm_panel = importlib.import_module("custom_components.elmo_modbus.alarm_control_panel")
 coordinator = importlib.import_module("custom_components.elmo_modbus.coordinator")
 
+AlarmControlPanelState = importlib.import_module(
+    "homeassistant.components.alarm_control_panel"
+).AlarmControlPanelState
+
 ElmoModbusAlarmControlPanel = alarm_panel.ElmoModbusAlarmControlPanel
 ElmoInventorySnapshot = coordinator.ElmoInventorySnapshot
 ElmoPanelStatus = coordinator.ElmoPanelStatus
+MODE_TO_STATE = alarm_panel.MODE_TO_STATE
 
 
 def _build_panel(*, managed: set[int], status: ElmoPanelStatus | None, span: int) -> ElmoModbusAlarmControlPanel:
@@ -23,6 +28,27 @@ def _build_panel(*, managed: set[int], status: ElmoPanelStatus | None, span: int
         holding_registers={},
     )
     panel.coordinator = SimpleNamespace(data=snapshot, sector_count=span)  # type: ignore[attr-defined]
+    return panel
+
+
+def _build_state_panel(
+    *,
+    managed: set[int],
+    armed_bits: tuple[bool, ...],
+    triggered_bits: tuple[bool, ...] | None = None,
+    mode_sectors: dict[str, set[int]] | None = None,
+) -> ElmoModbusAlarmControlPanel:
+    """Helper to build a panel with mode_sectors for alarm_state tests."""
+    span = len(armed_bits)
+    if triggered_bits is None:
+        triggered_bits = tuple(False for _ in armed_bits)
+    status = ElmoPanelStatus(armed=armed_bits, triggered=triggered_bits)
+    panel = _build_panel(managed=managed, status=status, span=span)
+    if mode_sectors is None:
+        mode_sectors = {}
+    panel._mode_sectors = {  # type: ignore[attr-defined]
+        mode: sectors for mode, sectors in mode_sectors.items()
+    }
     return panel
 
 
@@ -48,3 +74,69 @@ def test_build_command_payload_without_status_defaults_to_scope() -> None:
     payload = panel._build_command_payload([2, 4], value=True)
 
     assert payload == [False, True, False, True]
+
+
+# ── alarm_state priority tests ──────────────────────────────────────────
+
+
+def test_armed_away_priority_when_all_away_sectors_active() -> None:
+    """armed_away should activate when all its configured sectors are armed,
+    even if extra sectors are also armed."""
+
+    panel = _build_state_panel(
+        managed={1, 2, 3, 4},
+        armed_bits=(True, True, True, True),
+        mode_sectors={"away": {1, 2, 3, 4}, "home": {1, 2}},
+    )
+
+    assert panel.alarm_state == AlarmControlPanelState.ARMED_AWAY
+
+
+def test_armed_away_priority_superset_of_other_modes() -> None:
+    """armed_away takes priority even when armed sectors also fully cover
+    another mode's sectors."""
+
+    panel = _build_state_panel(
+        managed={1, 2, 3, 4},
+        armed_bits=(True, True, True, False),
+        mode_sectors={"away": {1, 2, 3}, "night": {1, 2, 3}},
+    )
+
+    assert panel.alarm_state == AlarmControlPanelState.ARMED_AWAY
+
+
+def test_armed_away_with_extra_sectors_armed() -> None:
+    """armed_away should be returned when all away sectors are armed,
+    plus additional sectors outside any mode."""
+
+    panel = _build_state_panel(
+        managed={1, 2, 3, 4, 5},
+        armed_bits=(True, True, True, True, True),
+        mode_sectors={"away": {1, 2, 3}, "home": {4, 5}},
+    )
+
+    assert panel.alarm_state == AlarmControlPanelState.ARMED_AWAY
+
+
+def test_armed_home_when_away_sectors_not_fully_armed() -> None:
+    """If not all away sectors are armed, other modes can still match exactly."""
+
+    panel = _build_state_panel(
+        managed={1, 2, 3, 4},
+        armed_bits=(True, True, False, False),
+        mode_sectors={"away": {1, 2, 3, 4}, "home": {1, 2}},
+    )
+
+    assert panel.alarm_state == AlarmControlPanelState.ARMED_HOME
+
+
+def test_disarmed_when_no_sectors_armed() -> None:
+    """Panel with no sectors armed should be DISARMED."""
+
+    panel = _build_state_panel(
+        managed={1, 2, 3},
+        armed_bits=(False, False, False),
+        mode_sectors={"away": {1, 2, 3}},
+    )
+
+    assert panel.alarm_state == AlarmControlPanelState.DISARMED
