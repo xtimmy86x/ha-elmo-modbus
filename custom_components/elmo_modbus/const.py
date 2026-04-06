@@ -23,13 +23,24 @@ OPTION_INPUT_BATTERY = "input_battery"
 OPTION_OUTPUT_NAMES = "output_names"
 OPTION_SECTOR_SWITCH_NAMES = "sector_switch_names"
 
-REGISTER_ALARM_START = 5121
-REGISTER_STATUS_START = 12289
-REGISTER_COMMAND_START = 12289
+# Modbus addresses — the same address may appear twice when the panel
+# uses one function code for reading (FC2 read discrete inputs) and
+# another for writing (FC5/FC15 write coils).
 
-INPUT_SENSOR_START = 4097
-INPUT_SENSOR_EXCLUDED_START = 8193
-INPUT_BATTERY_START = 0x8001  # 32769 - low battery status (FC2, 0/1)
-OUTPUT_SWITCH_START = 20481
-INPUT_EXCLUDE_START = 8193
+REGISTER_ALARM_START = 5121  # FC2: alarm/triggered status per sector
+
+# Sector arming: same address 12289 is read via FC2 (status) and
+# written via FC15 (arm/disarm command).
+REGISTER_STATUS_START = 12289   # FC2:  read armed status per sector
+REGISTER_COMMAND_START = 12289  # FC15: write arm/disarm command
+
+INPUT_SENSOR_START = 4097  # FC2: alarm input state
+
+# Input exclusion: same address 8193 is read via FC2 (current exclusion
+# state) and written via FC5 (exclude/include command).
+INPUT_SENSOR_EXCLUDED_START = 8193  # FC2: read exclusion state
+INPUT_EXCLUDE_START = 8193          # FC5: write exclude/include command
+
+INPUT_BATTERY_START = 0x8001  # 32769 — FC2: low battery status (0/1)
+OUTPUT_SWITCH_START = 20481   # FC1/FC5: output relay coils
 INOUT_MAX_COUNT = 1024
