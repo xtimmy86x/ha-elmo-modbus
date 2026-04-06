@@ -18,10 +18,14 @@ from pymodbus.exceptions import ConnectionException
 
 from .const import (
     CONF_OUTPUT_SWITCHES,
+    CONF_SECTOR_SWITCHES,
+    DEFAULT_SECTORS,
     DOMAIN,
     INOUT_MAX_COUNT,
     OPTION_OUTPUT_NAMES,
+    OPTION_SECTOR_SWITCH_NAMES,
     OUTPUT_SWITCH_START,
+    REGISTER_COMMAND_START,
 )
 from .coordinator import ElmoModbusCoordinator, ElmoModbusInventory
 from .input_selectors import normalize_input_sensor_config
@@ -35,6 +39,14 @@ class ElmoSwitchDescription(SwitchEntityDescription):
     """Description of an Elmo Modbus output switch."""
 
     address: int
+    object_id: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class ElmoSectorSwitchDescription(SwitchEntityDescription):
+    """Description of an Elmo Modbus sector switch."""
+
+    sector: int
     object_id: str | None = None
 
 
@@ -138,6 +150,96 @@ async def async_setup_entry(
     if entities:
         async_add_entities(entities)
 
+    # --- Sector switches ---
+    raw_sector_switches = entry.options.get(CONF_SECTOR_SWITCHES, [])
+    sector_ids: list[int] = []
+    sector_limit = int(entry.data.get("sectors", DEFAULT_SECTORS))
+    if isinstance(raw_sector_switches, list):
+        for item in raw_sector_switches:
+            try:
+                sid = int(item)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= sid <= sector_limit:
+                sector_ids.append(sid)
+        sector_ids = sorted(set(sector_ids))
+
+    if not sector_ids:
+        return
+
+    raw_sector_names = entry.options.get(OPTION_SECTOR_SWITCH_NAMES, {})
+    sector_names: dict[int, str] = {}
+    if isinstance(raw_sector_names, dict):
+        for key, value in raw_sector_names.items():
+            try:
+                sector = int(key)
+            except (TypeError, ValueError):
+                continue
+            if sector not in sector_ids:
+                continue
+            name = str(value).strip()
+            if name:
+                sector_names[sector] = name
+
+    sector_descriptions: list[ElmoSectorSwitchDescription] = []
+    used_sector_ids: set[str] = set()
+    for sector in sector_ids:
+        custom_name = sector_names.get(sector)
+        desc_kwargs: dict[str, Any] = {
+            "key": f"sector_switch_{sector}",
+            "sector": sector,
+        }
+
+        if custom_name:
+            desc_kwargs["name"] = custom_name
+        else:
+            desc_kwargs["translation_key"] = "sector_switch"
+            desc_kwargs["translation_placeholders"] = {"index": str(sector)}
+
+        if custom_name:
+            obj_id = slugify(custom_name) or f"sector_switch_{sector}"
+        else:
+            obj_id = f"sector_switch_{sector}"
+
+        if obj_id in used_sector_ids:
+            obj_id = f"{obj_id}_{sector}"
+        used_sector_ids.add(obj_id)
+
+        desc_kwargs["object_id"] = obj_id
+        sector_descriptions.append(ElmoSectorSwitchDescription(**desc_kwargs))
+
+    if not sector_descriptions:
+        return
+
+    entity_registry = er.async_get(hass)
+    for desc in sector_descriptions:
+        if not desc.object_id:
+            continue
+
+        unique_id = f"{entry.entry_id}:switch:{desc.key}"
+        entity_id = entity_registry.async_get_entity_id("switch", DOMAIN, unique_id)
+        if entity_id is None:
+            continue
+
+        device_slug = slugify(entry.title)
+        desired_entity_id = f"switch.{device_slug}_{desc.object_id}"
+        if entity_id == desired_entity_id:
+            continue
+
+        existing_entry = entity_registry.entities.get(desired_entity_id)
+        if existing_entry is not None and existing_entry.unique_id != unique_id:
+            continue
+
+        entity_registry.async_update_entity(entity_id, new_entity_id=desired_entity_id)
+
+    sector_entities = [
+        ElmoSectorSwitch(entry, coordinator, inventory, desc)
+        for desc in sector_descriptions
+    ]
+
+    if sector_entities:
+        async_add_entities(sector_entities)
+
 
 class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusCoordinator], SwitchEntity):
     """Representation of an Elmo Modbus output switch."""
@@ -208,6 +310,93 @@ class ElmoModbusSwitch(CoordinatorEntity[ElmoModbusCoordinator], SwitchEntity):
         except Exception as err:  # pragma: no cover - unexpected failure guard
             raise HomeAssistantError(
                 f"Unexpected error while updating output {address}: {err}"
+            ) from err
+
+        await self.coordinator.async_request_refresh()
+
+
+class ElmoSectorSwitch(CoordinatorEntity[ElmoModbusCoordinator], SwitchEntity):
+    """Switch to arm/disarm an individual alarm sector."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        coordinator: ElmoModbusCoordinator,
+        inventory: ElmoModbusInventory,
+        description: ElmoSectorSwitchDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._config_entry = entry
+        self._inventory = inventory
+        self._sector = description.sector
+        self._attr_unique_id = f"{entry.entry_id}:switch:{description.key}"
+        if description.object_id:
+            self._attr_suggested_object_id = description.object_id
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when the sector is armed."""
+
+        snapshot = self.coordinator.data
+        if not snapshot or not snapshot.status:
+            return None
+        armed = snapshot.status.armed
+        index = self._sector - 1
+        if index >= len(armed):
+            return None
+        return bool(armed[index])
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information shared across entities."""
+
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
+            manufacturer="Elmo",
+            name=self._config_entry.title,
+        )
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Arm the sector."""
+
+        await self._async_write_sector(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disarm the sector."""
+
+        await self._async_write_sector(False)
+
+    async def _async_write_sector(self, value: bool) -> None:
+        """Write the desired arming state for this sector."""
+
+        snapshot = self.coordinator.data
+        status = snapshot.status if snapshot else None
+
+        if status:
+            payload = list(status.armed)
+        else:
+            span = max(1, min(self.coordinator.sector_count, DEFAULT_SECTORS))
+            payload = [False] * span
+
+        index = self._sector - 1
+        if index >= len(payload):
+            raise HomeAssistantError(
+                f"Sector {self._sector} is out of range"
+            )
+
+        payload[index] = value
+
+        def _write() -> None:
+            self._inventory.write_coils(REGISTER_COMMAND_START, payload)
+
+        try:
+            await self.hass.async_add_executor_job(_write)
+        except ConnectionException as err:
+            raise HomeAssistantError(
+                f"Failed to update sector {self._sector}: {err}"
             ) from err
 
         await self.coordinator.async_request_refresh()

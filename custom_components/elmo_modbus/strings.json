@@ -31,6 +31,7 @@
                "config":"Edit connection settings",
                "inputs":"Configure alarm inputs",
                "outputs":"Configure outputs",
+               "sector_switches":"Configure sector switches",
                "panels":"Configure panels",
                "add_panel":"Add panel",
                "user_codes":"Manage user codes"
@@ -92,6 +93,24 @@
             "data":{
                "default_output_name":"Output {number}",
                "pre_title":"Name of output"
+            }
+         },
+         "sector_switches":{
+            "title":"Sector switches",
+            "description":"Specify which sectors to expose as individual arm/disarm switches. Sectors must be between 1 and {max_sector}.",
+            "data":{
+               "sector_switches":"Sectors to expose"
+            },
+            "data_description":{
+               "sector_switches":"Provide comma-separated sector numbers (e.g. 1,3,5)."
+            }
+         },
+         "sector_switch_names":{
+            "title":"Name sector switches",
+            "description":"Assign a descriptive name to each of the {count} selected sector switches.",
+            "data":{
+               "default_sector_name":"Sector {number}",
+               "pre_title":"Name of sector"
             }
          },
          "panels":{
@@ -278,6 +297,13 @@
             "state":{
                "on":"On",
                "off":"Off"
+            }
+         },
+         "sector_switch":{
+            "name":"Sector {index}",
+            "state":{
+               "on":"Armed",
+               "off":"Disarmed"
             }
          }
       },

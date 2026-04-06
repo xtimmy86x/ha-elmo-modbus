@@ -17,6 +17,7 @@ from .const import (
     CONF_INPUT_SENSORS,
     CONF_OUTPUT_SWITCHES,
     CONF_SCAN_INTERVAL,
+    CONF_SECTOR_SWITCHES,
     CONF_SECTORS,
     DEFAULT_NAME,
     DEFAULT_SCAN_INTERVAL,
@@ -26,6 +27,7 @@ from .const import (
     OPTION_INPUT_BATTERY,
     OPTION_INPUT_NAMES,
     OPTION_OUTPUT_NAMES,
+    OPTION_SECTOR_SWITCH_NAMES,
     OPTION_USER_CODES,
 )
 from .input_selectors import (
@@ -99,6 +101,35 @@ async def _async_output_name_templates(
     return str(default_template), str(title_template)
 
 
+async def _async_sector_switch_name_templates(
+    hass: HomeAssistant,
+) -> tuple[str, str]:
+    """Return templates for default sector switch names and titles."""
+
+    try:
+        translations = await async_get_translations(
+            hass,
+            language=hass.config.language,
+            category="options",
+            integrations={DOMAIN},
+            config_flow=True,
+        )
+    except Exception:  # pragma: no cover - defensive, HA handles logging
+        _LOGGER.debug(
+            "Falling back to default sector switch name templates", exc_info=True
+        )
+        return "Sector {number}", "Name of sector"
+
+    base_key = f"component.{DOMAIN}.options.step.sector_switch_names.data.{{}}"
+    default_template = translations.get(
+        base_key.format("default_sector_name"), "Sector {number}"
+    )
+    title_template = translations.get(
+        base_key.format("pre_title"), "Name of sector"
+    )
+    return str(default_template), str(title_template)
+
+
 def _format_with_number(template: str, number: int) -> str:
     """Format a translation template, ignoring missing placeholders."""
 
@@ -143,6 +174,7 @@ MENU_OPTION_OUTPUTS = "outputs"
 MENU_OPTION_PANELS = "panels"
 MENU_OPTION_ADD_PANEL = "add_panel"
 MENU_OPTION_USER_CODES = "user_codes"
+MENU_OPTION_SECTOR_SWITCHES = "sector_switches"
 
 
 def _format_sector_list(sectors: list[int] | None) -> str:
@@ -378,6 +410,36 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         self._output_name_templates: tuple[str, str] | None = None
         self._output_name_language: str | None = None
 
+        self._sector_switch_ids: list[int] = []
+        raw_sector_switches = config_entry.options.get(CONF_SECTOR_SWITCHES, [])
+        if isinstance(raw_sector_switches, list):
+            for item in raw_sector_switches:
+                try:
+                    sid = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= sid <= self._sector_limit:
+                    self._sector_switch_ids.append(sid)
+            self._sector_switch_ids = sorted(set(self._sector_switch_ids))
+
+        raw_sector_names = config_entry.options.get(OPTION_SECTOR_SWITCH_NAMES, {})
+        self._sector_switch_names: dict[str, str] = {}
+        if isinstance(raw_sector_names, dict):
+            for key, value in raw_sector_names.items():
+                try:
+                    sector = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if sector not in self._sector_switch_ids:
+                    continue
+                name = str(value).strip()
+                if name:
+                    self._sector_switch_names[str(sector)] = name
+
+        self._pending_sector_switch_ids: list[int] | None = None
+        self._sector_switch_name_templates: tuple[str, str] | None = None
+        self._sector_switch_name_language: str | None = None
+
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
     ) -> FlowResult:
@@ -389,6 +451,7 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
                 MENU_OPTION_CONFIG,
                 MENU_OPTION_INPUTS,
                 MENU_OPTION_OUTPUTS,
+                MENU_OPTION_SECTOR_SWITCHES,
                 MENU_OPTION_PANELS,
                 MENU_OPTION_ADD_PANEL,
                 MENU_OPTION_USER_CODES,
@@ -879,6 +942,10 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
         options[OPTION_OUTPUT_NAMES] = {
             key: value for key, value in self._output_names.items() if key and value
         }
+        options[CONF_SECTOR_SWITCHES] = list(self._sector_switch_ids)
+        options[OPTION_SECTOR_SWITCH_NAMES] = {
+            key: value for key, value in self._sector_switch_names.items() if key and value
+        }
         self.hass.config_entries.async_update_entry(
             self._config_entry,
             options=options,
@@ -904,6 +971,152 @@ class ElmoModbusOptionsFlowHandler(config_entries.OptionsFlow):
             if key in self._output_names:
                 existing[key] = self._output_names[key]
         self._output_names = existing
+
+    def _retain_sector_switch_names(self, sector_ids: list[int]) -> None:
+        """Preserve configured names for the provided sector identifiers."""
+
+        existing: dict[str, str] = {}
+        for sector in sector_ids:
+            key = str(sector)
+            if key in self._sector_switch_names:
+                existing[key] = self._sector_switch_names[key]
+        self._sector_switch_names = existing
+
+    async def async_step_sector_switches(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure which sectors should be exposed as individual switches."""
+
+        default_sectors = list(self._sector_switch_ids)
+        default_value = _format_sector_list(default_sectors)
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            raw_selection = user_input.get(CONF_SECTOR_SWITCHES, "")
+
+            if not raw_selection or not raw_selection.strip():
+                self._sector_switch_ids = []
+                self._sector_switch_names = {}
+                self._pending_sector_switch_ids = None
+                self._update_config_entry_options()
+                return await self.async_step_init()
+
+            try:
+                sectors = _parse_sector_input(
+                    raw_selection, max_sector=self._sector_limit
+                )
+            except vol.Invalid:
+                errors[CONF_SECTOR_SWITCHES] = "invalid_sector"
+                sectors = default_sectors
+
+            if not errors:
+                self._pending_sector_switch_ids = sectors
+                self._retain_sector_switch_names(sectors)
+                return await self.async_step_sector_switch_names()
+
+            schema = vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_SECTOR_SWITCHES,
+                        default=raw_selection,
+                    ): str,
+                }
+            )
+        else:
+            schema = vol.Schema(
+                {
+                    vol.Optional(CONF_SECTOR_SWITCHES, default=default_value): str,
+                }
+            )
+
+        return self.async_show_form(
+            step_id="sector_switches",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"max_sector": str(self._sector_limit)},
+        )
+
+    async def async_step_sector_switch_names(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Assign names to each configured sector switch."""
+
+        sector_ids = self._pending_sector_switch_ids or self._sector_switch_ids
+        if not sector_ids:
+            self._sector_switch_ids = []
+            self._sector_switch_names = {}
+            self._pending_sector_switch_ids = None
+            self._update_config_entry_options()
+            return await self.async_step_init()
+
+        hass = self.hass
+        language = getattr(getattr(hass, "config", None), "language", None)
+        if self._sector_switch_name_language != language:
+            self._sector_switch_name_templates = None
+            self._sector_switch_name_language = language
+
+        if self._sector_switch_name_templates is None:
+            if hass is None:
+                self._sector_switch_name_templates = (
+                    "Sector {number}",
+                    "Name of sector",
+                )
+            else:
+                self._sector_switch_name_templates = (
+                    await _async_sector_switch_name_templates(hass)
+                )
+
+        default_template, title_template = self._sector_switch_name_templates
+
+        errors: dict[str, str] = {}
+        collected: dict[str, str] = {}
+        field_labels: dict[int, str] = {}
+        defaults: dict[int, str] = {}
+
+        for sector in sector_ids:
+            label = _format_with_number(title_template, sector)
+            if label == title_template:
+                label = f"{label} {sector}"
+            field_labels[sector] = label
+            stored_name = self._sector_switch_names.get(str(sector))
+            if stored_name:
+                defaults[sector] = stored_name
+                continue
+            fallback = _format_with_number(default_template, sector)
+            if fallback == default_template:
+                fallback = f"Sector {sector}"
+            defaults[sector] = fallback
+
+        if user_input is not None:
+            for sector in sector_ids:
+                field = field_labels[sector]
+                raw_value = (user_input.get(field) or "").strip()
+                if not raw_value:
+                    errors[field] = "required"
+                else:
+                    collected[str(sector)] = raw_value
+
+            if not errors:
+                self._sector_switch_ids = sector_ids
+                self._sector_switch_names = collected
+                self._pending_sector_switch_ids = None
+                self._update_config_entry_options()
+                return await self.async_step_init()
+
+        schema_dict: dict[Any, Any] = {}
+        for sector in sector_ids:
+            field = field_labels[sector]
+            schema_dict[vol.Required(field, default=defaults[sector])] = str
+
+        schema = vol.Schema(schema_dict)
+
+        return self.async_show_form(
+            step_id="sector_switch_names",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"count": str(len(sector_ids))},
+        )
 
     async def async_step_panels(
         self, user_input: dict[str, Any] | None = None

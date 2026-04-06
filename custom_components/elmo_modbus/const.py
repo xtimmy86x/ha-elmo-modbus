@@ -10,6 +10,7 @@ CONF_SECTORS = "sectors"
 CONF_SCAN_INTERVAL = "scan_interval"
 CONF_INPUT_SENSORS = "input_sensors"
 CONF_OUTPUT_SWITCHES = "output_switches"
+CONF_SECTOR_SWITCHES = "sector_switches"
 
 OPTION_ARMED_AWAY_SECTORS = "armed_away_sectors"
 OPTION_ARMED_HOME_SECTORS = "armed_home_sectors"
@@ -20,6 +21,7 @@ OPTION_USER_CODES = "user_codes"
 OPTION_INPUT_NAMES = "input_names"
 OPTION_INPUT_BATTERY = "input_battery"
 OPTION_OUTPUT_NAMES = "output_names"
+OPTION_SECTOR_SWITCH_NAMES = "sector_switch_names"
 
 REGISTER_ALARM_START = 5121
 REGISTER_STATUS_START = 12289

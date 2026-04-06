@@ -31,6 +31,7 @@
                "config":"Modifica impostazioni connessione",
                "inputs":"Configura ingressi di allarme",
                "outputs":"Configura uscite",
+               "sector_switches":"Configura switch settori",
                "panels":"Configura pannelli",
                "add_panel":"Aggiungi pannello",
                "user_codes":"Gestisci codici utente"
@@ -92,6 +93,24 @@
             "data":{
                "default_output_name":"Uscita {number}",
                "pre_title":"Nome dell'uscita"
+            }
+         },
+         "sector_switches":{
+            "title":"Switch settori",
+            "description":"Specifica quali settori esporre come switch individuali per inserimento/disinserimento. I settori devono essere compresi tra 1 e {max_sector}.",
+            "data":{
+               "sector_switches":"Settori da esporre"
+            },
+            "data_description":{
+               "sector_switches":"Fornisci numeri di settore separati da virgole (es. 1,3,5)."
+            }
+         },
+         "sector_switch_names":{
+            "title":"Assegna nomi ai settori",
+            "description":"Assegna un nome descrittivo a ciascuno dei {count} switch settore selezionati.",
+            "data":{
+               "default_sector_name":"Settore {number}",
+               "pre_title":"Nome del settore"
             }
          },        
          "panels":{
@@ -278,6 +297,13 @@
             "state":{
                "on":"Attivo",
                "off":"Disattivo"
+            }
+         },
+         "sector_switch":{
+            "name":"Settore {index}",
+            "state":{
+               "on":"Inserito",
+               "off":"Disinserito"
             }
          }
       },
