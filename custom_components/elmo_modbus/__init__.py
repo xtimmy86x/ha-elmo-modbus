@@ -74,7 +74,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator: ElmoModbusCoordinator = entry_data["coordinator"]
         await coordinator.async_close()
 
-        await async_unload_services(hass)
+        if not hass.data[DOMAIN]:
+            await async_unload_services(hass)
 
     return unload_ok
 
