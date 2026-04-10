@@ -257,71 +257,80 @@ class ElmoModbusAlarmControlPanel(
         status = snapshot.status
         armed_bits = status.armed
         triggered_bits = status.triggered
-        
-        # read current status of general alarm input
+
         general_alarm = snapshot.discrete_inputs.get(0x0200)
 
-        # settori armati globali (1-based)
-        armed_sectors_all = {i + 1 for i, b in enumerate(armed_bits) if bool(b)}
-        triggered_sectors_all = {i + 1 for i, b in enumerate(triggered_bits) if bool(b)}
+        panel_armed, panel_triggered, panel_total = self._compute_panel_sectors(
+            armed_bits, triggered_bits,
+        )
 
-        # limita la vista del pannello ai soli settori gestiti (se definiti)
-        if self._managed_sectors:
-            panel_armed_sectors = armed_sectors_all & self._managed_sectors
-            panel_triggered_sectors = triggered_sectors_all & self._managed_sectors & panel_armed_sectors
-            panel_total = len(self._managed_sectors)
-        else:
-            panel_armed_sectors = armed_sectors_all
-            panel_triggered_sectors = triggered_sectors_all & panel_armed_sectors
-            panel_total = len(armed_bits)
-
-        panel_armed_count = len(panel_armed_sectors)
-
-        if panel_triggered_sectors and general_alarm:
+        if panel_triggered and general_alarm:
             return AlarmControlPanelState.TRIGGERED
 
-        # SE tutti i settori gestiti dal pannello sono disarmati -> DISARMED
-        if panel_armed_count == 0:
+        if not panel_armed:
             return AlarmControlPanelState.DISARMED
 
-        # mappa modalità -> set settori configurati
-        # (già limitati per definizione del pannello)
+        return self._resolve_armed_state(panel_armed, panel_total)
+
+    def _compute_panel_sectors(
+        self,
+        armed_bits: tuple[bool, ...],
+        triggered_bits: tuple[bool, ...],
+    ) -> tuple[set[int], set[int], int]:
+        """Derive armed/triggered sector sets scoped to this panel."""
+
+        armed_all = {i + 1 for i, b in enumerate(armed_bits) if b}
+        triggered_all = {i + 1 for i, b in enumerate(triggered_bits) if b}
+
+        if self._managed_sectors:
+            armed = armed_all & self._managed_sectors
+            triggered = triggered_all & self._managed_sectors & armed
+            total = len(self._managed_sectors)
+        else:
+            armed = armed_all
+            triggered = triggered_all & armed
+            total = len(armed_bits)
+
+        return armed, triggered, total
+
+    def _resolve_armed_state(
+        self, panel_armed: set[int], panel_total: int,
+    ) -> AlarmControlPanelState:
+        """Match the armed sectors against configured mode profiles."""
+
         options_map: dict[AlarmControlPanelState, set[int]] = {
-            MODE_TO_STATE[mode]: sectors for mode, sectors in self._mode_sectors.items()
+            MODE_TO_STATE[mode]: sectors
+            for mode, sectors in self._mode_sectors.items()
         }
 
-        # armed_away ha priorità: se tutti i suoi settori sono attivi -> ARMED_AWAY
+        # Armed-away takes priority: if all its sectors are active, match
         away_sectors = options_map.get(AlarmControlPanelState.ARMED_AWAY)
-        if away_sectors and away_sectors <= panel_armed_sectors:
+        if away_sectors and away_sectors <= panel_armed:
             return AlarmControlPanelState.ARMED_AWAY
 
-        # match esatto per le restanti modalità
+        # Exact match for remaining modes
         for state, sectors in options_map.items():
             if state == AlarmControlPanelState.ARMED_AWAY:
                 continue
-            if panel_armed_sectors == sectors:
+            if panel_armed == sectors:
                 return state
 
-        # tutti i settori del pannello armati -> away
-        if panel_armed_count == panel_total:
+        # All panel sectors armed → away
+        if len(panel_armed) == panel_total:
             return AlarmControlPanelState.ARMED_AWAY
 
-        # match per intersezione (almeno 1 settore del profilo è armato), con priorità
-        matches = []
-        for state, sectors in options_map.items():
-            overlap = len(panel_armed_sectors & sectors)
-            if overlap > 0:
-                matches.append((overlap, STATE_PRIORITY.get(state, 0), state))
-
+        # Partial overlap: pick the mode with the most matching sectors
+        matches = [
+            (len(panel_armed & sectors), STATE_PRIORITY.get(state, 0), state)
+            for state, sectors in options_map.items()
+            if panel_armed & sectors
+        ]
         if matches:
-            matches.sort(reverse=True)  # per overlap desc, poi priorità desc
+            matches.sort(reverse=True)
             return matches[0][2]
 
-        # fallback: panel armato ma non mappa nessun profilo conosciuto
-        try:
-            return AlarmControlPanelState.ARMED_CUSTOM_BYPASS
-        except AttributeError:
-            return AlarmControlPanelState.ARMED_AWAY
+        # Armed but no configured profile matches
+        return AlarmControlPanelState.ARMED_CUSTOM_BYPASS
 
     @property
     def available(self) -> bool:
