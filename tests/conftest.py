@@ -327,9 +327,13 @@ def pytest_configure() -> None:
 
     pymodbus_exceptions_module = types.ModuleType("pymodbus.exceptions")
 
+    class ModbusException(Exception):
+        pass
+
     class ConnectionException(Exception):
         pass
 
+    pymodbus_exceptions_module.ModbusException = ModbusException  # type: ignore[attr-defined]
     pymodbus_exceptions_module.ConnectionException = ConnectionException  # type: ignore[attr-defined]
     sys.modules["pymodbus.exceptions"] = pymodbus_exceptions_module
 

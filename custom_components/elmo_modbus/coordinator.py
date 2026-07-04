@@ -10,7 +10,7 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from pymodbus.client import ModbusTcpClient
-from pymodbus.exceptions import ConnectionException
+from pymodbus.exceptions import ConnectionException, ModbusException
 
 from .const import (
     DEFAULT_SCAN_INTERVAL,
@@ -306,13 +306,26 @@ class ElmoModbusCoordinator(DataUpdateCoordinator[ElmoInventorySnapshot]):
 
     async def _async_update_data(self) -> ElmoInventorySnapshot:
         """Poll the Modbus device via the shared inventory."""
-        
+
         try:
             return await self.hass.async_add_executor_job(self._inventory.refresh)
         except ConnectionException as err:
+            await self._async_reset_connection()
             raise UpdateFailed(f"Modbus connection failed: {err}") from err
+        except ModbusException as err:
+            await self._async_reset_connection()
+            raise UpdateFailed(f"Modbus communication failed: {err}") from err
         except Exception as err:  # pragma: no cover - safety net for unexpected errors
+            await self._async_reset_connection()
             raise UpdateFailed(f"Unexpected Modbus error: {err}") from err
+
+    async def _async_reset_connection(self) -> None:
+        """Reset the TCP client so the next poll attempts a fresh reconnect."""
+
+        try:
+            await self.hass.async_add_executor_job(self._inventory.close)
+        except Exception:  # pragma: no cover - best effort cleanup
+            _COORD_LOGGER.debug("Failed to reset Modbus client connection", exc_info=True)
 
     async def async_close(self) -> None:
         """Close the underlying Modbus client connection."""
